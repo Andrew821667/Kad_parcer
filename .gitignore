@@ -55,9 +55,9 @@ logs/
 *.db
 *.sqlite3
 
-# MinIO/Storage
-storage/
-uploads/
+# MinIO/Storage (data files, not source code)
+/storage/
+/uploads/
 
 # Celery
 celerybeat-schedule

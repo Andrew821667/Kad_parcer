@@ -1,0 +1,96 @@
+version: '3.8'
+
+services:
+  api:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    container_name: kad-parser-api
+    ports:
+      - "8000:8000"
+    environment:
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
+      - POSTGRES_DB=kad_parser
+      - POSTGRES_USER=kad_user
+      - POSTGRES_PASSWORD=kad_password
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - MINIO_ENDPOINT=minio:9000
+      - MINIO_ACCESS_KEY=minioadmin
+      - MINIO_SECRET_KEY=minioadmin
+    depends_on:
+      - postgres
+      - redis
+      - minio
+    networks:
+      - kad-network
+
+  celery_worker:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    container_name: kad-parser-worker
+    command: celery -A src.tasks.celery_app worker --loglevel=info
+    environment:
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
+      - POSTGRES_DB=kad_parser
+      - POSTGRES_USER=kad_user
+      - POSTGRES_PASSWORD=kad_password
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - MINIO_ENDPOINT=minio:9000
+      - MINIO_ACCESS_KEY=minioadmin
+      - MINIO_SECRET_KEY=minioadmin
+    depends_on:
+      - postgres
+      - redis
+      - minio
+    networks:
+      - kad-network
+
+  postgres:
+    image: postgres:15-alpine
+    container_name: kad-parser-postgres
+    environment:
+      - POSTGRES_DB=kad_parser
+      - POSTGRES_USER=kad_user
+      - POSTGRES_PASSWORD=kad_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - kad-network
+
+  redis:
+    image: redis:7-alpine
+    container_name: kad-parser-redis
+    ports:
+      - "6379:6379"
+    networks:
+      - kad-network
+
+  minio:
+    image: minio/minio:latest
+    container_name: kad-parser-minio
+    command: server /data --console-address ":9001"
+    environment:
+      - MINIO_ROOT_USER=minioadmin
+      - MINIO_ROOT_PASSWORD=minioadmin
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio_data:/data
+    networks:
+      - kad-network
+
+volumes:
+  postgres_data:
+  minio_data:
+
+networks:
+  kad-network:
+    driver: bridge
