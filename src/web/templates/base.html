@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="ru" class="h-full bg-gray-100">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}KAD Parser{% endblock %}</title>
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- HTMX -->
+    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+
+    <!-- Alpine.js for interactivity -->
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+
+    <!-- Chart.js for analytics -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+
+    <style>
+        [x-cloak] { display: none !important; }
+    </style>
+</head>
+<body class="h-full">
+    <div class="min-h-full">
+        <!-- Navigation -->
+        <nav class="bg-indigo-600">
+            <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+                <div class="flex h-16 items-center justify-between">
+                    <div class="flex items-center">
+                        <div class="flex-shrink-0">
+                            <svg class="h-8 w-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                            </svg>
+                        </div>
+                        <div class="ml-10 flex items-baseline space-x-4">
+                            <a href="/ui" class="text-white hover:bg-indigo-500 px-3 py-2 rounded-md text-sm font-medium">Главная</a>
+                            <a href="/ui/cases" class="text-white hover:bg-indigo-500 px-3 py-2 rounded-md text-sm font-medium">Дела</a>
+                            <a href="/ui/analytics" class="text-white hover:bg-indigo-500 px-3 py-2 rounded-md text-sm font-medium">Аналитика</a>
+                            <a href="/ui/export" class="text-white hover:bg-indigo-500 px-3 py-2 rounded-md text-sm font-medium">Экспорт</a>
+                            <a href="/api/docs" class="text-white hover:bg-indigo-500 px-3 py-2 rounded-md text-sm font-medium" target="_blank">API</a>
+                        </div>
+                    </div>
+                    <div class="flex items-center">
+                        <span class="text-white text-sm">v0.1.0</span>
+                    </div>
+                </div>
+            </div>
+        </nav>
+
+        <!-- Page Header -->
+        <header class="bg-white shadow">
+            <div class="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
+                <h1 class="text-3xl font-bold tracking-tight text-gray-900">
+                    {% block header %}KAD Parser{% endblock %}
+                </h1>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main>
+            <div class="mx-auto max-w-7xl py-6 sm:px-6 lg:px-8">
+                {% block content %}{% endblock %}
+            </div>
+        </main>
+    </div>
+
+    <!-- Toast Notifications -->
+    <div id="toast-container" class="fixed bottom-4 right-4 space-y-2" x-data="{ toasts: [] }">
+        <template x-for="toast in toasts" :key="toast.id">
+            <div
+                x-show="toast.show"
+                x-transition
+                class="bg-white shadow-lg rounded-lg p-4 max-w-md"
+                :class="{
+                    'border-l-4 border-green-500': toast.type === 'success',
+                    'border-l-4 border-red-500': toast.type === 'error',
+                    'border-l-4 border-blue-500': toast.type === 'info'
+                }"
+            >
+                <p class="text-sm font-medium" x-text="toast.message"></p>
+            </div>
+        </template>
+    </div>
+
+    {% block extra_js %}{% endblock %}
+</body>
+</html>
