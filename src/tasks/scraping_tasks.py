@@ -17,8 +17,10 @@ from src.storage.database.repository import (
     ParticipantRepository,
     ScrapingTaskRepository,
 )
+from src.storage.database.webhook_models import WebhookEvent
 from src.storage.files.minio_storage import get_storage
 from src.tasks.celery_app import celery_app
+from src.webhooks.dispatcher import WebhookDispatcher
 
 logger = get_logger(__name__)
 
@@ -78,6 +80,19 @@ async def _scrape_case_async(task_id: str, case_number: str) -> dict:
             started_at=datetime.utcnow(),
         )
 
+        # Initialize webhook dispatcher
+        webhook_dispatcher = WebhookDispatcher(session)
+
+        # Dispatch task started event
+        await webhook_dispatcher.dispatch(
+            WebhookEvent.CASE_SCRAPING_STARTED,
+            {
+                "task_id": task_id,
+                "case_number": case_number,
+                "started_at": datetime.utcnow().isoformat(),
+            },
+        )
+
         try:
             # Search for case using KAD client
             async with KadArbitrClient() as client:
@@ -117,10 +132,28 @@ async def _scrape_case_async(task_id: str, case_number: str) -> dict:
                         status=CaseStatus.IN_PROGRESS,
                         last_scraped_at=datetime.utcnow(),
                     )
+                    # Dispatch case updated event
+                    await webhook_dispatcher.dispatch(
+                        WebhookEvent.CASE_UPDATED,
+                        {
+                            "case_id": case.id,
+                            "case_number": case.case_number,
+                            "updated_at": datetime.utcnow().isoformat(),
+                        },
+                    )
                 else:
                     case = await case_repo.create(
                         **case_info,
                         last_scraped_at=datetime.utcnow(),
+                    )
+                    # Dispatch case created event
+                    await webhook_dispatcher.dispatch(
+                        WebhookEvent.CASE_CREATED,
+                        {
+                            "case_id": case.id,
+                            "case_number": case.case_number,
+                            "created_at": datetime.utcnow().isoformat(),
+                        },
                     )
 
                 # Create participants
@@ -183,6 +216,22 @@ async def _scrape_case_async(task_id: str, case_number: str) -> dict:
 
                 await session.commit()
 
+                # Dispatch scraping completed event
+                await webhook_dispatcher.dispatch(
+                    WebhookEvent.CASE_SCRAPING_COMPLETED,
+                    {
+                        "task_id": task_id,
+                        "case_id": case.id,
+                        "case_number": case.case_number,
+                        "completed_at": datetime.utcnow().isoformat(),
+                        "stats": {
+                            "participants": len(participants_data),
+                            "documents": len(documents_data),
+                            "hearings": len(hearings_data),
+                        },
+                    },
+                )
+
                 return {
                     "status": "success",
                     "case_id": case.id,
@@ -203,6 +252,18 @@ async def _scrape_case_async(task_id: str, case_number: str) -> dict:
                 error=str(e),
                 completed_at=datetime.utcnow(),
             )
+
+            # Dispatch scraping failed event
+            await webhook_dispatcher.dispatch(
+                WebhookEvent.CASE_SCRAPING_FAILED,
+                {
+                    "task_id": task_id,
+                    "case_number": case_number,
+                    "error": str(e),
+                    "failed_at": datetime.utcnow().isoformat(),
+                },
+            )
+
             await session.commit()
 
             return {"status": "error", "message": str(e)}
