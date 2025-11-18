@@ -8,7 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
-from src.api.routes import analytics, cases, documents, export
+from src.api.routes import analytics, auth, cases, documents, export
 from src.core.config import get_settings
 from src.core.logging import get_logger
 from src.web import routes as web_routes
@@ -45,6 +45,7 @@ app.add_middleware(
 )
 
 # Include API routers
+app.include_router(auth.router, prefix="/api")
 app.include_router(cases.router, prefix="/api")
 app.include_router(documents.router, prefix="/api")
 app.include_router(analytics.router, prefix="/api")
@@ -89,12 +90,14 @@ async def api_info() -> dict:
     """API information."""
     return {
         "endpoints": {
+            "auth": "/api/auth",
             "cases": "/api/cases",
             "documents": "/api/documents",
             "analytics": "/api/analytics",
             "export": "/api/export",
         },
         "features": [
+            "JWT authentication and API keys",
             "Full CRUD operations",
             "Advanced search and filtering",
             "Analytics and reporting",

@@ -7,6 +7,7 @@ from sqlalchemy import engine_from_config, pool
 
 from src.core.config import get_settings
 from src.storage.database.base import Base
+from src.storage.database.auth_models import APIKey, User  # noqa: F401
 from src.storage.database.models import (  # noqa: F401
     Case,
     Document,
