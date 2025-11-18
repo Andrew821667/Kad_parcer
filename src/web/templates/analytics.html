@@ -1,0 +1,206 @@
+{% extends "base.html" %}
+
+{% block title %}Аналитика - KAD Parser{% endblock %}
+{% block header %}Аналитика и статистика{% endblock %}
+
+{% block content %}
+<div class="px-4 sm:px-0" x-data="{
+    loading: true,
+    overview: null,
+    topCourts: [],
+    async loadData() {
+        const [overviewResp, courtsResp] = await Promise.all([
+            fetch('/api/analytics/overview'),
+            fetch('/api/analytics/courts?limit=10')
+        ]);
+        this.overview = await overviewResp.json();
+        this.topCourts = await courtsResp.json();
+        this.loading = false;
+
+        // Initialize charts after data loads
+        setTimeout(() => this.initCharts(), 100);
+    },
+    initCharts() {
+        // Parse Rate Pie Chart
+        const parseCtx = document.getElementById('parseRateChart');
+        if (parseCtx) {
+            new Chart(parseCtx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Распарсено', 'Не распарсено'],
+                    datasets: [{
+                        data: [
+                            this.overview.parsed_documents,
+                            this.overview.total_documents - this.overview.parsed_documents
+                        ],
+                        backgroundColor: ['#10B981', '#EF4444']
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false
+                }
+            });
+        }
+
+        // Top Courts Bar Chart
+        const courtsCtx = document.getElementById('topCourtsChart');
+        if (courtsCtx && this.topCourts.length > 0) {
+            new Chart(courtsCtx, {
+                type: 'bar',
+                data: {
+                    labels: this.topCourts.map(c => c.court_name.substring(0, 30) + '...'),
+                    datasets: [{
+                        label: 'Количество дел',
+                        data: this.topCourts.map(c => c.case_count),
+                        backgroundColor: '#6366F1'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: false
+                        }
+                    }
+                }
+            });
+        }
+    }
+}" x-init="loadData()">
+
+    <!-- Loading State -->
+    <div x-show="loading" class="text-center py-8">
+        <svg class="animate-spin h-10 w-10 text-indigo-600 mx-auto" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+        </svg>
+        <p class="mt-2 text-sm text-gray-500">Загрузка данных...</p>
+    </div>
+
+    <!-- Statistics Cards -->
+    <div x-show="!loading" class="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4 mb-8">
+        <div class="bg-white overflow-hidden shadow rounded-lg">
+            <div class="p-5">
+                <div class="flex items-center">
+                    <div class="flex-shrink-0">
+                        <svg class="h-6 w-6 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                        </svg>
+                    </div>
+                    <div class="ml-5 w-0 flex-1">
+                        <dl>
+                            <dt class="text-sm font-medium text-gray-500 truncate">Всего дел</dt>
+                            <dd class="text-2xl font-semibold text-gray-900" x-text="overview?.total_cases || '0'"></dd>
+                        </dl>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="bg-white overflow-hidden shadow rounded-lg">
+            <div class="p-5">
+                <div class="flex items-center">
+                    <div class="flex-shrink-0">
+                        <svg class="h-6 w-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                        </svg>
+                    </div>
+                    <div class="ml-5 w-0 flex-1">
+                        <dl>
+                            <dt class="text-sm font-medium text-gray-500 truncate">Документов</dt>
+                            <dd class="text-2xl font-semibold text-gray-900" x-text="overview?.total_documents || '0'"></dd>
+                        </dl>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="bg-white overflow-hidden shadow rounded-lg">
+            <div class="p-5">
+                <div class="flex items-center">
+                    <div class="flex-shrink-0">
+                        <svg class="h-6 w-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                        </svg>
+                    </div>
+                    <div class="ml-5 w-0 flex-1">
+                        <dl>
+                            <dt class="text-sm font-medium text-gray-500 truncate">Участников</dt>
+                            <dd class="text-2xl font-semibold text-gray-900" x-text="overview?.total_participants || '0'"></dd>
+                        </dl>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="bg-white overflow-hidden shadow rounded-lg">
+            <div class="p-5">
+                <div class="flex items-center">
+                    <div class="flex-shrink-0">
+                        <svg class="h-6 w-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                        </svg>
+                    </div>
+                    <div class="ml-5 w-0 flex-1">
+                        <dl>
+                            <dt class="text-sm font-medium text-gray-500 truncate">% обработки</dt>
+                            <dd class="text-2xl font-semibold text-gray-900" x-text="(overview?.parse_rate || '0') + '%'"></dd>
+                        </dl>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Charts -->
+    <div x-show="!loading" class="grid grid-cols-1 gap-6 lg:grid-cols-2 mb-8">
+        <!-- Parse Rate Chart -->
+        <div class="bg-white shadow sm:rounded-lg p-6">
+            <h3 class="text-lg font-medium text-gray-900 mb-4">Статус обработки документов</h3>
+            <div style="height: 300px;">
+                <canvas id="parseRateChart"></canvas>
+            </div>
+        </div>
+
+        <!-- Top Courts Chart -->
+        <div class="bg-white shadow sm:rounded-lg p-6">
+            <h3 class="text-lg font-medium text-gray-900 mb-4">Топ судов по количеству дел</h3>
+            <div style="height: 300px;">
+                <canvas id="topCourtsChart"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <!-- Top Courts Table -->
+    <div x-show="!loading" class="bg-white shadow sm:rounded-lg">
+        <div class="px-4 py-5 sm:p-6">
+            <h3 class="text-lg font-medium leading-6 text-gray-900 mb-4">Детальная статистика по судам</h3>
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">#</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Суд</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Количество дел</th>
+                        </tr>
+                    </thead>
+                    <tbody class="bg-white divide-y divide-gray-200">
+                        <template x-for="(court, index) in topCourts" :key="index">
+                            <tr>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500" x-text="index + 1"></td>
+                                <td class="px-6 py-4 text-sm text-gray-900" x-text="court.court_name"></td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                    <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-indigo-100 text-indigo-800" x-text="court.case_count"></span>
+                                </td>
+                            </tr>
+                        </template>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+</div>
+{% endblock %}
