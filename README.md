@@ -1,131 +1,131 @@
 # KAD Parser
 
-Comprehensive system for parsing court documents from the Russian Arbitration Courts system (КАД Арбитр).
+Комплексная система парсинга документов из системы арбитражных судов РФ (КАД Арбитр).
 
-## Features
+## Возможности
 
-### Core Functionality
-- 🔍 **Case Scraping** - Collect case information from КАД Арбитр
-- 📄 **Document Processing** - Parse PDF, DOCX and HTML documents
-- 💾 **Data Storage** - PostgreSQL for structured data, MinIO for files
-- 🚀 **Async Processing** - Celery with Beat scheduler for background tasks
-- 🌐 **REST API** - FastAPI with OpenAPI/Swagger documentation
-- 🎯 **Rate Limiting** - Token bucket algorithm for API compliance
+### Основной функционал
+- 🔍 **Парсинг дел** - Сбор информации о делах из КАД Арбитр
+- 📄 **Обработка документов** - Парсинг PDF, DOCX и HTML документов
+- 💾 **Хранение данных** - PostgreSQL для структурированных данных, MinIO для файлов
+- 🚀 **Асинхронная обработка** - Celery с планировщиком Beat для фоновых задач
+- 🌐 **REST API** - FastAPI с документацией OpenAPI/Swagger
+- 🎯 **Ограничение частоты запросов** - Алгоритм Token Bucket для соблюдения требований API
 
-### Advanced Features
-- 🔐 **Authentication** - JWT tokens and API keys
-- 🪝 **Webhooks** - Event notifications with retry logic and HMAC signatures
-- 🔌 **Plugin System** - Extensible architecture for custom parsers, processors, exporters
-- ⏰ **Scheduled Tasks** - Celery Beat for periodic maintenance and monitoring
-- 📊 **Analytics** - Case statistics and reporting
-- 📤 **Export** - JSON, CSV, Excel formats
-- 🎨 **Web UI** - Modern interface with Tailwind CSS, HTMX, Alpine.js
+### Расширенные возможности
+- 🔐 **Аутентификация** - JWT токены и API ключи
+- 🪝 **Вебхуки** - Уведомления о событиях с логикой повторов и HMAC подписями
+- 🔌 **Система плагинов** - Расширяемая архитектура для пользовательских парсеров, процессоров, экспортеров
+- ⏰ **Запланированные задачи** - Celery Beat для периодического обслуживания и мониторинга
+- 📊 **Аналитика** - Статистика по делам и отчетность
+- 📤 **Экспорт** - Форматы JSON, CSV, Excel
+- 🎨 **Веб-интерфейс** - Современный интерфейс на Tailwind CSS, HTMX, Alpine.js
 
-## Technology Stack
+## Технологический стек
 
 - **Backend**: Python 3.11+, FastAPI, SQLAlchemy 2.0 (async)
-- **Database**: PostgreSQL 15+ (with asyncpg)
-- **Cache/Queue**: Redis 7+ (Celery broker)
-- **Storage**: MinIO (S3-compatible object storage)
-- **Tasks**: Celery + Celery Beat
-- **Auth**: JWT (python-jose), bcrypt (passlib)
-- **Parsing**: BeautifulSoup4, pdfplumber, python-docx
+- **БД**: PostgreSQL 15+ (с asyncpg)
+- **Кэш/Очередь**: Redis 7+ (брокер Celery)
+- **Хранилище**: MinIO (S3-совместимое объектное хранилище)
+- **Задачи**: Celery + Celery Beat
+- **Аутентификация**: JWT (python-jose), bcrypt (passlib)
+- **Парсинг**: BeautifulSoup4, pdfplumber, python-docx
 - **HTTP**: httpx (async), curl-cffi
-- **Web UI**: Jinja2, Tailwind CSS, HTMX, Alpine.js, Chart.js
-- **Export**: openpyxl (Excel), CSV, JSON
+- **Веб-интерфейс**: Jinja2, Tailwind CSS, HTMX, Alpine.js, Chart.js
+- **Экспорт**: openpyxl (Excel), CSV, JSON
 
-## Project Structure
+## Структура проекта
 
 ```
 kad_parser/
 ├── src/
-│   ├── core/           # Configuration, logging, exceptions
-│   ├── scraper/        # КАД Арбитр scraping with rate limiting
-│   ├── parser/         # Document parsers (HTML/PDF/DOCX)
-│   ├── storage/        # Database models and MinIO storage
-│   │   ├── database/   # SQLAlchemy models and repositories
-│   │   └── files/      # MinIO file storage
-│   ├── tasks/          # Celery tasks and Beat scheduler
-│   ├── api/            # FastAPI application
-│   │   ├── routes/     # API endpoints (auth, webhooks, plugins, etc.)
-│   │   └── schemas/    # Pydantic schemas
-│   ├── webhooks/       # Webhook dispatcher and delivery
-│   ├── plugins/        # Plugin system (base classes and manager)
-│   ├── web/            # Web UI templates and routes
-│   └── cli/            # CLI interface
-├── plugins/            # User plugins directory
-├── tests/              # Tests (unit and integration)
-├── docker/             # Docker configuration
-└── scripts/            # Utility scripts
+│   ├── core/           # Конфигурация, логирование, исключения
+│   ├── scraper/        # Скрейпинг КАД Арбитр с ограничением частоты запросов
+│   ├── parser/         # Парсеры документов (HTML/PDF/DOCX)
+│   ├── storage/        # Модели БД и хранилище MinIO
+│   │   ├── database/   # Модели SQLAlchemy и репозитории
+│   │   └── files/      # Файловое хранилище MinIO
+│   ├── tasks/          # Задачи Celery и планировщик Beat
+│   ├── api/            # Приложение FastAPI
+│   │   ├── routes/     # API эндпоинты (auth, webhooks, plugins и т.д.)
+│   │   └── schemas/    # Схемы Pydantic
+│   ├── webhooks/       # Диспетчер вебхуков и доставка
+│   ├── plugins/        # Система плагинов (базовые классы и менеджер)
+│   ├── web/            # Шаблоны и маршруты веб-интерфейса
+│   └── cli/            # CLI интерфейс
+├── plugins/            # Директория пользовательских плагинов
+├── tests/              # Тесты (модульные и интеграционные)
+├── docker/             # Конфигурация Docker
+└── scripts/            # Утилиты
 ```
 
-## Quick Start
+## Быстрый старт
 
-### Installation
+### Установка
 
 ```bash
-# Install dependencies with uv (recommended)
+# Установка зависимостей с uv (рекомендуется)
 uv pip install -e ".[dev]"
 
-# Or with pip
+# Или с pip
 pip install -e ".[dev]"
 
-# Install additional dependencies
+# Установка дополнительных зависимостей
 uv pip install email-validator
 ```
 
-### Configuration
+### Конфигурация
 
-Copy `.env.example` to `.env` and configure environment variables:
+Скопируйте `.env.example` в `.env` и настройте переменные окружения:
 
 ```bash
 cp .env.example .env
 ```
 
-Key variables:
-- `SECRET_KEY` - JWT secret key
-- `POSTGRES_*` - PostgreSQL connection settings
-- `REDIS_*` - Redis connection settings
-- `MINIO_*` - MinIO connection settings
+Ключевые переменные:
+- `SECRET_KEY` - Секретный ключ для JWT
+- `POSTGRES_*` - Настройки подключения к PostgreSQL
+- `REDIS_*` - Настройки подключения к Redis
+- `MINIO_*` - Настройки подключения к MinIO
 
-### Running with Docker
+### Запуск с Docker
 
 ```bash
-# Start all services (API, Worker, Beat, PostgreSQL, Redis, MinIO)
+# Запуск всех сервисов (API, Worker, Beat, PostgreSQL, Redis, MinIO)
 docker-compose -f docker/docker-compose.yml up -d
 
-# Services:
+# Сервисы:
 # - API: http://localhost:8000
 # - API Docs: http://localhost:8000/api/docs
-# - Web UI: http://localhost:8000/ui
-# - MinIO Console: http://localhost:9001
+# - Веб-интерфейс: http://localhost:8000/ui
+# - Консоль MinIO: http://localhost:9001
 ```
 
-### Running Locally
+### Локальный запуск
 
 ```bash
-# 1. Start PostgreSQL and Redis
-# 2. Run migrations
+# 1. Запустите PostgreSQL и Redis
+# 2. Выполните миграции
 alembic upgrade head
 
-# 3. Start API server
+# 3. Запустите API сервер
 kad-parser serve
-# or
+# или
 uvicorn src.api.app:app --reload
 
-# 4. Start Celery worker
+# 4. Запустите Celery worker
 celery -A src.tasks.celery_app worker --loglevel=info
 
-# 5. Start Celery Beat (for periodic tasks)
+# 5. Запустите Celery Beat (для периодических задач)
 celery -A src.tasks.celery_app beat --loglevel=info
 ```
 
-## Usage
+## Использование
 
-### Authentication
+### Аутентификация
 
 ```bash
-# Register user
+# Регистрация пользователя
 curl -X POST http://localhost:8000/api/auth/register \
   -H "Content-Type: application/json" \
   -d '{
@@ -134,7 +134,7 @@ curl -X POST http://localhost:8000/api/auth/register \
     "password": "securepassword"
   }'
 
-# Login
+# Вход
 curl -X POST http://localhost:8000/api/auth/login \
   -H "Content-Type: application/json" \
   -d '{
@@ -142,206 +142,206 @@ curl -X POST http://localhost:8000/api/auth/login \
     "password": "securepassword"
   }'
 
-# Create API key
+# Создание API ключа
 curl -X POST http://localhost:8000/api/auth/api-keys \
-  -H "Authorization: Bearer YOUR_JWT_TOKEN" \
+  -H "Authorization: Bearer ВАШ_JWT_ТОКЕН" \
   -H "Content-Type: application/json" \
   -d '{
-    "name": "My API Key",
+    "name": "Мой API ключ",
     "expires_days": 30
   }'
 ```
 
-### Webhooks
+### Вебхуки
 
 ```bash
-# Create webhook
+# Создание вебхука
 curl -X POST http://localhost:8000/api/webhooks \
-  -H "Authorization: Bearer YOUR_JWT_TOKEN" \
+  -H "Authorization: Bearer ВАШ_JWT_ТОКЕН" \
   -H "Content-Type: application/json" \
   -d '{
-    "name": "Case Updates",
+    "name": "Обновления дел",
     "url": "https://your-server.com/webhook",
-    "secret": "your_webhook_secret",
+    "secret": "ваш_секрет_вебхука",
     "events": ["case.created", "case.updated"],
     "max_retries": 3,
     "retry_delay": 60
   }'
 
-# List webhooks
+# Список вебхуков
 curl http://localhost:8000/api/webhooks \
-  -H "Authorization: Bearer YOUR_JWT_TOKEN"
+  -H "Authorization: Bearer ВАШ_JWT_ТОКЕН"
 
-# Test webhook
+# Тестирование вебхука
 curl -X POST http://localhost:8000/api/webhooks/{webhook_id}/test \
-  -H "Authorization: Bearer YOUR_JWT_TOKEN" \
+  -H "Authorization: Bearer ВАШ_JWT_ТОКЕН" \
   -H "Content-Type: application/json" \
-  -d '{"message": "Test delivery"}'
+  -d '{"message": "Тестовая доставка"}'
 ```
 
-### Plugins
+### Плагины
 
 ```bash
-# List plugins
+# Список плагинов
 curl http://localhost:8000/api/plugins \
-  -H "Authorization: Bearer YOUR_JWT_TOKEN"
+  -H "Authorization: Bearer ВАШ_JWT_ТОКЕН"
 
-# Enable/disable plugin
-curl -X PATCH http://localhost:8000/api/plugins/{plugin_name}/status \
-  -H "Authorization: Bearer YOUR_JWT_TOKEN" \
+# Включение/отключение плагина
+curl -X PATCH http://localhost:8000/api/plugins/{имя_плагина}/status \
+  -H "Authorization: Bearer ВАШ_JWT_ТОКЕН" \
   -H "Content-Type: application/json" \
   -d '{"enabled": true}'
 
-# Configure plugin
-curl -X POST http://localhost:8000/api/plugins/{plugin_name}/configure \
-  -H "Authorization: Bearer YOUR_JWT_TOKEN" \
+# Конфигурация плагина
+curl -X POST http://localhost:8000/api/plugins/{имя_плагина}/configure \
+  -H "Authorization: Bearer ВАШ_JWT_ТОКЕН" \
   -H "Content-Type: application/json" \
   -d '{"config": {"option": "value"}}'
 
-# Reload plugins
+# Перезагрузка плагинов
 curl -X POST http://localhost:8000/api/plugins/reload \
-  -H "Authorization: Bearer YOUR_JWT_TOKEN"
+  -H "Authorization: Bearer ВАШ_JWT_ТОКЕН"
 ```
 
-### Cases
+### Дела
 
 ```bash
-# Scrape case
+# Парсинг дела
 curl -X POST http://localhost:8000/api/cases/scrape \
-  -H "Authorization: Bearer YOUR_JWT_TOKEN" \
+  -H "Authorization: Bearer ВАШ_JWT_ТОКЕН" \
   -H "Content-Type: application/json" \
   -d '{"case_number": "А40-123456/2024"}'
 
-# List cases
+# Список дел
 curl http://localhost:8000/api/cases \
-  -H "Authorization: Bearer YOUR_JWT_TOKEN"
+  -H "Authorization: Bearer ВАШ_JWT_ТОКЕН"
 
-# Get case
+# Получение дела
 curl http://localhost:8000/api/cases/{case_id} \
-  -H "Authorization: Bearer YOUR_JWT_TOKEN"
+  -H "Authorization: Bearer ВАШ_JWT_ТОКЕН"
 
-# Export cases
+# Экспорт дел
 curl http://localhost:8000/api/export/cases?format=xlsx \
-  -H "Authorization: Bearer YOUR_JWT_TOKEN" \
+  -H "Authorization: Bearer ВАШ_JWT_ТОКЕН" \
   -O cases.xlsx
 ```
 
 ### CLI
 
 ```bash
-# Check version
+# Проверка версии
 kad-parser version
 
-# Scrape case
+# Парсинг дела
 kad-parser scrape А40-123456/2024
 
-# Start API server
+# Запуск API сервера
 kad-parser serve --host 0.0.0.0 --port 8000
 ```
 
-## Development
+## Разработка
 
-### Testing
+### Тестирование
 
 ```bash
-# All tests
+# Все тесты
 pytest
 
-# With coverage
+# С покрытием
 pytest --cov=src --cov-report=html --cov-report=term-missing
 
-# Specific module
+# Конкретный модуль
 pytest tests/unit/test_scraper_kad_client.py -v
 
-# Integration tests
+# Интеграционные тесты
 pytest tests/integration/ -v
 ```
 
-### Linting and Formatting
+### Линтинг и форматирование
 
 ```bash
-# Ruff (linting and formatting)
+# Ruff (линтинг и форматирование)
 ruff check src/
 ruff format src/
 
-# MyPy (type checking)
+# MyPy (проверка типов)
 mypy src/
 ```
 
-### Database Migrations
+### Миграции БД
 
 ```bash
-# Create migration
-alembic revision --autogenerate -m "Description"
+# Создание миграции
+alembic revision --autogenerate -m "Описание"
 
-# Apply migrations
+# Применение миграций
 alembic upgrade head
 
-# Rollback
+# Откат
 alembic downgrade -1
 
-# Show current version
+# Текущая версия
 alembic current
 ```
 
-## Architecture
+## Архитектура
 
-### Modules
+### Модули
 
-- **core** - Configuration, logging, exception handling
-- **scraper** - КАД Арбитр API client with rate limiting and retry logic
-- **parser** - Extract data from HTML, PDF, DOCX documents
-- **storage** - Repository pattern for database, MinIO for file storage
-- **tasks** - Celery tasks for async processing, Beat for scheduling
-- **api** - REST API with FastAPI
-- **webhooks** - Event notification system with retry logic
-- **plugins** - Extensible plugin system
-- **web** - Modern web UI
-- **cli** - Command-line interface
+- **core** - Конфигурация, логирование, обработка исключений
+- **scraper** - Клиент API КАД Арбитр с ограничением частоты запросов и логикой повторов
+- **parser** - Извлечение данных из HTML, PDF, DOCX документов
+- **storage** - Паттерн Repository для БД, MinIO для файлового хранилища
+- **tasks** - Задачи Celery для асинхронной обработки, Beat для планирования
+- **api** - REST API на FastAPI
+- **webhooks** - Система уведомлений о событиях с логикой повторов
+- **plugins** - Расширяемая система плагинов
+- **web** - Современный веб-интерфейс
+- **cli** - Интерфейс командной строки
 
-### Database Models
+### Модели БД
 
-**Core:**
-- `User` - Authentication users
-- `APIKey` - API key authentication
+**Базовые:**
+- `User` - Пользователи для аутентификации
+- `APIKey` - Аутентификация по API ключу
 
-**Business:**
-- `Case` - Court case
-- `Participant` - Case participant
-- `Document` - Court document
-- `Hearing` - Court hearing
-- `ScrapingTask` - Scraping task history
+**Бизнес-логика:**
+- `Case` - Судебное дело
+- `Participant` - Участник дела
+- `Document` - Судебный документ
+- `Hearing` - Судебное заседание
+- `ScrapingTask` - История задач парсинга
 
-**System:**
-- `Webhook` - Webhook configuration
-- `WebhookDelivery` - Webhook delivery log
+**Системные:**
+- `Webhook` - Конфигурация вебхука
+- `WebhookDelivery` - Журнал доставки вебхуков
 
-### Webhook Events
+### События вебхуков
 
-**Case Events:**
-- `case.created` - New case created
-- `case.updated` - Case updated
-- `case.scraping.started` - Scraping started
-- `case.scraping.completed` - Scraping completed
-- `case.scraping.failed` - Scraping failed
+**События дел:**
+- `case.created` - Создано новое дело
+- `case.updated` - Дело обновлено
+- `case.scraping.started` - Парсинг начат
+- `case.scraping.completed` - Парсинг завершен
+- `case.scraping.failed` - Парсинг провален
 
-**Document Events:**
-- `document.created` - Document created
-- `document.updated` - Document updated
-- `document.parsing.started` - Parsing started
-- `document.parsing.completed` - Parsing completed
-- `document.parsing.failed` - Parsing failed
+**События документов:**
+- `document.created` - Документ создан
+- `document.updated` - Документ обновлен
+- `document.parsing.started` - Парсинг начат
+- `document.parsing.completed` - Парсинг завершен
+- `document.parsing.failed` - Парсинг провален
 
-**Task Events:**
-- `task.started` - Task started
-- `task.completed` - Task completed
-- `task.failed` - Task failed
+**События задач:**
+- `task.started` - Задача запущена
+- `task.completed` - Задача завершена
+- `task.failed` - Задача провалена
 
-### Plugin System
+### Система плагинов
 
-Create custom plugins by extending base classes:
+Создавайте пользовательские плагины, расширяя базовые классы:
 
-**Parser Plugin:**
+**Плагин парсера:**
 ```python
 from src.plugins.base import ParserPlugin
 
@@ -351,67 +351,67 @@ class MyParserPlugin(ParserPlugin):
         return "my_parser"
 
     async def parse(self, content: bytes, content_type: str) -> dict:
-        # Parse document
-        return {"text": "parsed content"}
+        # Парсинг документа
+        return {"text": "распарсенный контент"}
 
     def supports_content_type(self, content_type: str) -> bool:
         return content_type == "application/my-format"
 ```
 
-See `plugins/README.md` for complete documentation.
+См. `plugins/README.md` для полной документации.
 
-### Scheduled Tasks (Celery Beat)
+### Запланированные задачи (Celery Beat)
 
-- **Retry failed webhooks** - Every minute
-- **Clean up old deliveries** - Daily at 2 AM
-- **Update case statistics** - Hourly
-- **Check stuck tasks** - Every 15 minutes
-- **Cleanup expired sessions** - Daily at 3 AM
+- **Повтор неудавшихся вебхуков** - Каждую минуту
+- **Очистка старых доставок** - Ежедневно в 2:00
+- **Обновление статистики дел** - Каждый час
+- **Проверка зависших задач** - Каждые 15 минут
+- **Очистка истекших сессий** - Ежедневно в 3:00
 
-## API Documentation
+## Документация API
 
-Interactive API documentation available at:
+Интерактивная документация API доступна по адресам:
 - Swagger UI: `http://localhost:8000/api/docs`
 - ReDoc: `http://localhost:8000/api/redoc`
 
-## Performance
+## Производительность
 
-- Async/await throughout for maximum concurrency
-- Connection pooling for database and HTTP
-- Rate limiting with token bucket algorithm
-- Celery for distributed task processing
-- Redis for caching and message broker
-- MinIO for efficient file storage
+- Async/await повсеместно для максимального параллелизма
+- Пулы соединений для БД и HTTP
+- Ограничение частоты запросов с алгоритмом Token Bucket
+- Celery для распределенной обработки задач
+- Redis для кэширования и брокера сообщений
+- MinIO для эффективного хранения файлов
 
-## Security
+## Безопасность
 
-- JWT token-based authentication
-- API key authentication
-- Password hashing with bcrypt
-- HMAC signature verification for webhooks
+- Аутентификация на основе JWT токенов
+- Аутентификация по API ключам
+- Хэширование паролей с bcrypt
+- HMAC верификация подписей для вебхуков
 - CORS middleware
-- Input validation with Pydantic
-- SQL injection prevention with SQLAlchemy
-- XSS protection
+- Валидация входных данных с Pydantic
+- Защита от SQL инъекций с SQLAlchemy
+- Защита от XSS
 
-## Future Enhancements
+## Будущие улучшения
 
-- Prometheus + Grafana monitoring
-- Elasticsearch for full-text search
-- ML-based case categorization
-- Admin panel for system management
-- WebSocket support for real-time updates
+- Мониторинг Prometheus + Grafana
+- Elasticsearch для полнотекстового поиска
+- ML-категоризация дел
+- Админ-панель для управления системой
+- WebSocket поддержка для обновлений в реальном времени
 - GraphQL API
-- Multi-tenant support
+- Мультитенантность
 
-## License
+## Лицензия
 
-MIT License - see [LICENSE](LICENSE)
+MIT License - см. [LICENSE](LICENSE)
 
-## Author
+## Автор
 
 Andrew821667
 
-## Contributing
+## Участие в разработке
 
-Contributions are welcome! Please feel free to submit a Pull Request.
+Приветствуются любые вклады! Не стесняйтесь создавать Pull Request.

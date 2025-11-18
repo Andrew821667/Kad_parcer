@@ -1,13 +1,13 @@
-# KAD Parser Plugins
+# Плагины KAD Parser
 
-This directory contains plugins for extending the KAD Parser functionality.
+Эта директория содержит плагины для расширения функциональности KAD Parser.
 
-## Plugin Types
+## Типы плагинов
 
-### 1. Parser Plugins
-Custom document parsers for additional file formats.
+### 1. Плагины парсеров
+Пользовательские парсеры документов для дополнительных форматов файлов.
 
-**Example:**
+**Пример:**
 ```python
 from src.plugins.base import ParserPlugin
 
@@ -17,17 +17,17 @@ class MyParserPlugin(ParserPlugin):
         return "my_parser"
 
     async def parse(self, content: bytes, content_type: str) -> dict:
-        # Parse document content
-        return {"text": "parsed content"}
+        # Парсинг содержимого документа
+        return {"text": "распарсенный контент"}
 
     def supports_content_type(self, content_type: str) -> bool:
         return content_type == "application/my-format"
 ```
 
-### 2. Processor Plugins
-Data processors that transform or enrich data.
+### 2. Плагины процессоров
+Процессоры данных, которые преобразуют или обогащают данные.
 
-**Example:**
+**Пример:**
 ```python
 from src.plugins.base import ProcessorPlugin, PluginHook
 
@@ -36,65 +36,65 @@ class MyProcessorPlugin(ProcessorPlugin):
         return [PluginHook.AFTER_SCRAPE]
 
     async def process(self, data: dict) -> dict:
-        # Process data
+        # Обработка данных
         data["enriched"] = True
         return data
 ```
 
-### 3. Exporter Plugins
-Custom export formats.
+### 3. Плагины экспортеров
+Пользовательские форматы экспорта.
 
-**Example:**
+**Пример:**
 ```python
 from src.plugins.base import ExporterPlugin
 
 class MyExporterPlugin(ExporterPlugin):
     async def export(self, data: list[dict], options: dict) -> bytes:
-        # Export to custom format
+        # Экспорт в пользовательский формат
         return b"exported data"
 
     def get_file_extension(self) -> str:
         return ".myformat"
 ```
 
-## Plugin Hooks
+## Хуки плагинов
 
-Plugins can subscribe to various hooks in the application lifecycle:
+Плагины могут подписываться на различные хуки в жизненном цикле приложения:
 
-### Document Processing
-- `BEFORE_PARSE`: Before parsing a document
-- `AFTER_PARSE`: After successfully parsing a document
-- `PARSE_FAILED`: When document parsing fails
+### Обработка документов
+- `BEFORE_PARSE`: Перед парсингом документа
+- `AFTER_PARSE`: После успешного парсинга документа
+- `PARSE_FAILED`: Когда парсинг документа не удался
 
-### Case Processing
-- `BEFORE_SCRAPE`: Before scraping a case
-- `AFTER_SCRAPE`: After successfully scraping a case
-- `SCRAPE_FAILED`: When case scraping fails
+### Обработка дел
+- `BEFORE_SCRAPE`: Перед парсингом дела
+- `AFTER_SCRAPE`: После успешного парсинга дела
+- `SCRAPE_FAILED`: Когда парсинг дела не удался
 
-### Data Processing
-- `BEFORE_SAVE`: Before saving data to database
-- `AFTER_SAVE`: After saving data to database
+### Обработка данных
+- `BEFORE_SAVE`: Перед сохранением данных в БД
+- `AFTER_SAVE`: После сохранения данных в БД
 
-### Export
-- `BEFORE_EXPORT`: Before exporting data
-- `AFTER_EXPORT`: After exporting data
+### Экспорт
+- `BEFORE_EXPORT`: Перед экспортом данных
+- `AFTER_EXPORT`: После экспорта данных
 
-## Loading Plugins
+## Загрузка плагинов
 
-Plugins are automatically loaded from this directory when the application starts.
+Плагины автоматически загружаются из этой директории при запуске приложения.
 
-To reload plugins without restarting the application:
+Для перезагрузки плагинов без перезапуска приложения:
 
 ```bash
 POST /api/plugins/reload
 ```
 
-## Plugin Configuration
+## Конфигурация плагина
 
-Configure a plugin via API:
+Настройка плагина через API:
 
 ```bash
-POST /api/plugins/{plugin_name}/configure
+POST /api/plugins/{имя_плагина}/configure
 {
   "config": {
     "option1": "value1",
@@ -103,22 +103,22 @@ POST /api/plugins/{plugin_name}/configure
 }
 ```
 
-## Enable/Disable Plugins
+## Включение/отключение плагинов
 
 ```bash
-# Enable plugin
-PATCH /api/plugins/{plugin_name}/status
+# Включить плагин
+PATCH /api/plugins/{имя_плагина}/status
 {
   "enabled": true
 }
 
-# Disable plugin
-PATCH /api/plugins/{plugin_name}/status
+# Отключить плагин
+PATCH /api/plugins/{имя_плагина}/status
 {
   "enabled": false
 }
 ```
 
-## Example Plugins
+## Примеры плагинов
 
-See `example_exporter.py` and `example_processor.py` for complete working examples.
+См. `example_exporter.py` и `example_processor.py` для полных рабочих примеров.

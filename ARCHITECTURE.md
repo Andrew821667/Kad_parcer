@@ -1,73 +1,73 @@
-# Architecture Documentation
+# Документация по архитектуре
 
-## System Overview
+## Обзор системы
 
-KAD Parser is a comprehensive system for scraping and processing court documents from the Russian Arbitration Courts system (КАД Арбитр). It follows a modern async-first architecture with clear separation of concerns.
+KAD Parser - комплексная система для скрейпинга и обработки судебных документов из системы арбитражных судов РФ (КАД Арбитр). Следует современной async-first архитектуре с четким разделением ответственности.
 
-## Architecture Principles
+## Принципы архитектуры
 
-1. **Async-First**: Async/await throughout for maximum concurrency
-2. **Repository Pattern**: Database access abstraction
-3. **Dependency Injection**: FastAPI dependencies for clean code
-4. **Plugin Architecture**: Extensible via plugins
-5. **Event-Driven**: Webhook system for notifications
-6. **Scheduled Tasks**: Celery Beat for periodic operations
+1. **Async-First**: Async/await повсеместно для максимального параллелизма
+2. **Паттерн Repository**: Абстракция доступа к базе данных
+3. **Внедрение зависимостей**: Зависимости FastAPI для чистого кода
+4. **Плагинная архитектура**: Расширяемость через плагины
+5. **Событийная модель**: Система вебхуков для уведомлений
+6. **Запланированные задачи**: Celery Beat для периодических операций
 
-## Layers
+## Слои
 
-### 1. API Layer (`src/api/`)
+### 1. Слой API (`src/api/`)
 
-**FastAPI Application** with:
-- OpenAPI/Swagger documentation
-- JWT and API key authentication
+**Приложение FastAPI** с:
+- Документацией OpenAPI/Swagger
+- Аутентификацией JWT и API ключами
 - CORS middleware
-- Request validation with Pydantic
-- Async route handlers
+- Валидацией запросов с Pydantic
+- Асинхронными обработчиками маршрутов
 
-**Routes:**
-- `/auth` - Authentication (register, login, API keys)
-- `/webhooks` - Webhook management
-- `/plugins` - Plugin management
-- `/cases` - Case CRUD operations
-- `/documents` - Document management
-- `/analytics` - Statistics and reporting
-- `/export` - Data export (JSON, CSV, Excel)
+**Маршруты:**
+- `/auth` - Аутентификация (регистрация, вход, API ключи)
+- `/webhooks` - Управление вебхуками
+- `/plugins` - Управление плагинами
+- `/cases` - CRUD операции с делами
+- `/documents` - Управление документами
+- `/analytics` - Статистика и отчетность
+- `/export` - Экспорт данных (JSON, CSV, Excel)
 
-### 2. Business Logic Layer
+### 2. Слой бизнес-логики
 
 **Scraper** (`src/scraper/`):
-- `KadArbitrClient` - HTTP client for КАД Арбитр API
-- `RateLimiter` - Token bucket rate limiting
-- Retry logic with exponential backoff
-- Session management
+- `KadArbitrClient` - HTTP клиент для API КАД Арбитр
+- `RateLimiter` - Ограничение частоты запросов Token Bucket
+- Логика повторов с экспоненциальной задержкой
+- Управление сессиями
 
 **Parser** (`src/parser/`):
-- `HTMLCaseParser` - Extract data from case cards
-- `PDFDocumentParser` - Extract text from PDFs
-- `DOCXDocumentParser` - Extract text from DOCX
+- `HTMLCaseParser` - Извлечение данных из карточек дел
+- `PDFDocumentParser` - Извлечение текста из PDF
+- `DOCXDocumentParser` - Извлечение текста из DOCX
 
 **Webhooks** (`src/webhooks/`):
-- `WebhookDispatcher` - Event dispatching
-- HMAC signature generation
-- Retry logic with exponential backoff
-- Delivery tracking
+- `WebhookDispatcher` - Диспетчеризация событий
+- Генерация HMAC подписей
+- Логика повторов с экспоненциальной задержкой
+- Отслеживание доставки
 
 **Plugins** (`src/plugins/`):
-- `PluginManager` - Plugin loading and lifecycle
-- Base classes for different plugin types
-- Hook system for lifecycle events
+- `PluginManager` - Загрузка плагинов и управление жизненным циклом
+- Базовые классы для различных типов плагинов
+- Система хуков для событий жизненного цикла
 
-### 3. Data Layer
+### 3. Слой данных
 
 **Storage** (`src/storage/`):
 
 **Database** (`src/storage/database/`):
-- SQLAlchemy 2.0 async models
-- Alembic migrations
-- Repository pattern for data access
-- Connection pooling
+- Асинхронные модели SQLAlchemy 2.0
+- Миграции Alembic
+- Паттерн Repository для доступа к данным
+- Пулы соединений
 
-**Models:**
+**Модели:**
 ```
 ┌─────────────┐
 │    User     │
@@ -88,247 +88,247 @@ KAD Parser is a comprehensive system for scraping and processing court documents
                 └───────────────┘
 ```
 
-**File Storage** (`src/storage/files/`):
-- MinIO (S3-compatible) for documents
-- Presigned URLs for secure access
-- Automatic bucket creation
+**Файловое хранилище** (`src/storage/files/`):
+- MinIO (S3-совместимое) для документов
+- Предподписанные URL для безопасного доступа
+- Автоматическое создание бакетов
 
-### 4. Task Layer (`src/tasks/`)
+### 4. Слой задач (`src/tasks/`)
 
 **Celery Workers:**
-- `scrape_case_task` - Scrape case from КАД Арбитр
-- `parse_document_task` - Parse document content
-- `retry_failed_webhooks_task` - Retry failed webhook deliveries
+- `scrape_case_task` - Парсинг дела из КАД Арбитр
+- `parse_document_task` - Парсинг содержимого документа
+- `retry_failed_webhooks_task` - Повтор неудавшихся доставок вебхуков
 
-**Celery Beat Scheduler:**
-- Retry failed webhooks (every minute)
-- Cleanup old deliveries (daily)
-- Update statistics (hourly)
-- Check stuck tasks (every 15 minutes)
-- Cleanup expired sessions (daily)
+**Планировщик Celery Beat:**
+- Повтор неудавшихся вебхуков (каждую минуту)
+- Очистка старых доставок (ежедневно)
+- Обновление статистики (каждый час)
+- Проверка зависших задач (каждые 15 минут)
+- Очистка истекших сессий (ежедневно)
 
-### 5. Presentation Layer
+### 5. Слой представления
 
-**Web UI** (`src/web/`):
-- Server-side rendering with Jinja2
-- Tailwind CSS for styling
-- HTMX for dynamic updates
-- Alpine.js for interactivity
-- Chart.js for visualizations
+**Веб-интерфейс** (`src/web/`):
+- Серверный рендеринг с Jinja2
+- Tailwind CSS для стилизации
+- HTMX для динамических обновлений
+- Alpine.js для интерактивности
+- Chart.js для визуализаций
 
 **CLI** (`src/cli/`):
-- Typer-based command-line interface
-- Rich formatting
-- Interactive prompts
+- CLI интерфейс на базе Typer
+- Форматирование Rich
+- Интерактивные запросы
 
-## Data Flow
+## Поток данных
 
-### Scraping Flow
+### Поток парсинга
 
 ```
-User Request
+Запрос пользователя
     │
     ▼
-API Endpoint (/cases/scrape)
+API эндпоинт (/cases/scrape)
     │
     ▼
-Celery Task (scrape_case_task)
+Задача Celery (scrape_case_task)
     │
     ├─► KadArbitrClient
-    │   └─► КАД Арбитр API
+    │   └─► API КАД Арбитр
     │
     ├─► HTMLCaseParser
-    │   └─► Extract case data
+    │   └─► Извлечение данных дела
     │
-    ├─► Repository Layer
-    │   └─► Save to PostgreSQL
+    ├─► Слой Repository
+    │   └─► Сохранение в PostgreSQL
     │
-    ├─► MinIO Storage
-    │   └─► Store document files
+    ├─► Хранилище MinIO
+    │   └─► Сохранение файлов документов
     │
     ├─► WebhookDispatcher
-    │   └─► Send event notifications
+    │   └─► Отправка уведомлений о событиях
     │
-    └─► Response
+    └─► Ответ
 ```
 
-### Webhook Delivery Flow
+### Поток доставки вебхуков
 
 ```
-Event Trigger
+Триггер события
     │
     ▼
 WebhookDispatcher.dispatch()
     │
-    ├─► Find subscribed webhooks
+    ├─► Поиск подписанных вебхуков
     │
-    ├─► Create WebhookDelivery records
+    ├─► Создание записей WebhookDelivery
     │
-    ├─► Attempt delivery
-    │   ├─► Generate HMAC signature
-    │   ├─► HTTP POST to webhook URL
-    │   ├─► Record response
-    │   └─► Update statistics
+    ├─► Попытка доставки
+    │   ├─► Генерация HMAC подписи
+    │   ├─► HTTP POST на URL вебхука
+    │   ├─► Запись ответа
+    │   └─► Обновление статистики
     │
-    └─► On failure:
-        ├─► Schedule retry (exponential backoff)
-        └─► Celery Beat picks up for retry
+    └─► При неудаче:
+        ├─► Планирование повтора (экспоненциальная задержка)
+        └─► Celery Beat подхватывает для повтора
 ```
 
-### Plugin Lifecycle
+### Жизненный цикл плагина
 
 ```
-Application Startup
+Запуск приложения
     │
     ▼
 PluginManager.load_plugins()
     │
-    ├─► Scan plugins directory
+    ├─► Сканирование директории plugins
     │
-    ├─► For each plugin file:
-    │   ├─► Import module
-    │   ├─► Find Plugin classes
-    │   ├─► Instantiate plugin
-    │   ├─► Call plugin.initialize()
-    │   └─► Register hooks
+    ├─► Для каждого файла плагина:
+    │   ├─► Импорт модуля
+    │   ├─► Поиск классов Plugin
+    │   ├─► Создание экземпляра плагина
+    │   ├─► Вызов plugin.initialize()
+    │   └─► Регистрация хуков
     │
-    └─► Store in plugin registry
+    └─► Сохранение в реестре плагинов
 
-Hook Execution
+Выполнение хука
     │
     ▼
 PluginManager.execute_hook(hook, context)
     │
-    ├─► Find plugins subscribed to hook
+    ├─► Поиск плагинов, подписанных на хук
     │
-    ├─► For each plugin:
-    │   ├─► Check if enabled
-    │   ├─► Call plugin.on_hook(hook, context)
-    │   └─► Update context with result
+    ├─► Для каждого плагина:
+    │   ├─► Проверка включен ли
+    │   ├─► Вызов plugin.on_hook(hook, context)
+    │   └─► Обновление контекста результатом
     │
-    └─► Return final context
+    └─► Возврат финального контекста
 
-Application Shutdown
+Остановка приложения
     │
     ▼
 PluginManager.unload_all()
     │
-    └─► For each plugin:
-        └─► Call plugin.cleanup()
+    └─► Для каждого плагина:
+        └─► Вызов plugin.cleanup()
 ```
 
-## Security Architecture
+## Архитектура безопасности
 
-### Authentication
+### Аутентификация
 
 ```
-User Credentials
+Учетные данные пользователя
     │
     ▼
 /auth/login
     │
-    ├─► Verify password (bcrypt)
+    ├─► Проверка пароля (bcrypt)
     │
-    ├─► Generate JWT token
+    ├─► Генерация JWT токена
     │   ├─► Payload: {sub: user_id, username}
-    │   ├─► Sign with SECRET_KEY
-    │   └─► Set expiration
+    │   ├─► Подпись SECRET_KEY
+    │   └─► Установка срока действия
     │
-    └─► Return token
+    └─► Возврат токена
 
-Protected Endpoint
+Защищенный эндпоинт
     │
     ▼
 Authorization Header: Bearer {token}
     │
     ▼
-get_current_user() dependency
+Зависимость get_current_user()
     │
-    ├─► Decode JWT token
-    ├─► Verify signature
-    ├─► Check expiration
-    ├─► Load user from database
-    ├─► Verify user is active
+    ├─► Декодирование JWT токена
+    ├─► Проверка подписи
+    ├─► Проверка срока действия
+    ├─► Загрузка пользователя из БД
+    ├─► Проверка активности пользователя
     │
-    └─► Return user or raise 401
+    └─► Возврат пользователя или ошибка 401
 ```
 
-### API Key Authentication
+### Аутентификация по API ключу
 
 ```
-Request with X-API-Key header
+Запрос с заголовком X-API-Key
     │
     ▼
-verify_api_key() dependency
+Зависимость verify_api_key()
     │
-    ├─► Lookup API key in database
-    ├─► Verify is_active
-    ├─► Check expiration
-    ├─► Update last_used_at
+    ├─► Поиск API ключа в БД
+    ├─► Проверка is_active
+    ├─► Проверка срока действия
+    ├─► Обновление last_used_at
     │
-    └─► Return API key or raise 401
+    └─► Возврат API ключа или ошибка 401
 ```
 
-## Scalability
+## Масштабируемость
 
-### Horizontal Scaling
+### Горизонтальное масштабирование
 
-- **API Servers**: Multiple FastAPI instances behind load balancer
-- **Celery Workers**: Scale workers based on queue length
-- **Database**: PostgreSQL with read replicas
-- **Redis**: Redis Cluster for high availability
-- **MinIO**: Distributed MinIO cluster
+- **API серверы**: Несколько экземпляров FastAPI за балансировщиком нагрузки
+- **Celery Workers**: Масштабирование воркеров в зависимости от длины очереди
+- **БД**: PostgreSQL с репликами для чтения
+- **Redis**: Redis Cluster для высокой доступности
+- **MinIO**: Распределенный кластер MinIO
 
-### Caching Strategy
+### Стратегия кэширования
 
-- **Redis**: Session data, rate limiting counters
-- **Database**: Connection pooling, query result caching
-- **HTTP**: Client-side caching with ETags
+- **Redis**: Данные сессий, счетчики ограничения частоты
+- **БД**: Пулы соединений, кэширование результатов запросов
+- **HTTP**: Клиентское кэширование с ETag
 
-### Performance Optimizations
+### Оптимизации производительности
 
-- Async database queries with asyncpg
-- Batch inserts for bulk operations
-- Connection pooling (database, HTTP, Redis)
-- Rate limiting to prevent abuse
-- Lazy loading of relationships
-- Pagination for large result sets
+- Асинхронные запросы к БД с asyncpg
+- Пакетные вставки для массовых операций
+- Пулы соединений (БД, HTTP, Redis)
+- Ограничение частоты для предотвращения злоупотреблений
+- Ленивая загрузка связей
+- Пагинация для больших наборов данных
 
-## Monitoring and Observability
+## Мониторинг и наблюдаемость
 
-### Logging
+### Логирование
 
-- Structured logging with structlog
-- Log levels: DEBUG, INFO, WARNING, ERROR
-- Context: request_id, user_id, task_id
-- Output: JSON for production, colored for development
+- Структурированное логирование с structlog
+- Уровни логов: DEBUG, INFO, WARNING, ERROR
+- Контекст: request_id, user_id, task_id
+- Вывод: JSON для продакшена, цветной для разработки
 
-### Metrics (Future)
+### Метрики (будущее)
 
-- Prometheus metrics export
-- Request duration histograms
-- Error rate counters
-- Queue length gauges
-- Database connection pool metrics
+- Экспорт метрик Prometheus
+- Гистограммы длительности запросов
+- Счетчики частоты ошибок
+- Метрики длины очереди
+- Метрики пула соединений БД
 
-### Tracing (Future)
+### Трассировка (будущее)
 
-- OpenTelemetry integration
-- Distributed tracing across services
-- Request flow visualization
+- Интеграция OpenTelemetry
+- Распределенная трассировка между сервисами
+- Визуализация потока запросов
 
-## Deployment
+## Развертывание
 
 ### Docker Compose
 
 ```
 ┌─────────────────────────────────────────┐
-│          Load Balancer / Nginx          │
+│     Балансировщик нагрузки / Nginx      │
 └────┬────────────────────────────────┬───┘
      │                                │
 ┌────▼─────┐                    ┌────▼─────┐
 │   API    │                    │   API    │
-│ Instance │                    │ Instance │
+│Экземпляр │                    │Экземпляр │
 └────┬─────┘                    └────┬─────┘
      │                                │
      └────────────┬───────────────────┘
@@ -346,20 +346,20 @@ verify_api_key() dependency
                                     └─────────┘
 ```
 
-### Environment Variables
+### Переменные окружения
 
-- **Application**: DEBUG, SECRET_KEY, JWT_EXPIRATION
-- **Database**: POSTGRES_*
+- **Приложение**: DEBUG, SECRET_KEY, JWT_EXPIRATION
+- **БД**: POSTGRES_*
 - **Redis**: REDIS_*
 - **MinIO**: MINIO_*
 - **Celery**: BROKER_URL, RESULT_BACKEND
 
-## Future Architecture Enhancements
+## Будущие улучшения архитектуры
 
-1. **Event Sourcing**: Store all events for audit trail
-2. **CQRS**: Separate read and write models
-3. **GraphQL**: Alternative API with subscriptions
-4. **gRPC**: High-performance service-to-service communication
-5. **Service Mesh**: Istio for service discovery and routing
-6. **Kubernetes**: Container orchestration
-7. **Multi-tenancy**: Isolated data per organization
+1. **Event Sourcing**: Хранение всех событий для аудита
+2. **CQRS**: Разделение моделей чтения и записи
+3. **GraphQL**: Альтернативное API с подписками
+4. **gRPC**: Высокопроизводительная коммуникация между сервисами
+5. **Service Mesh**: Istio для обнаружения сервисов и маршрутизации
+6. **Kubernetes**: Оркестрация контейнеров
+7. **Мультитенантность**: Изолированные данные для каждой организации
