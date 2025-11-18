@@ -50,6 +50,25 @@ services:
     networks:
       - kad-network
 
+  celery_beat:
+    build:
+      context: ..
+      dockerfile: docker/celery-beat.Dockerfile
+    container_name: kad-parser-beat
+    environment:
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
+      - POSTGRES_DB=kad_parser
+      - POSTGRES_USER=kad_user
+      - POSTGRES_PASSWORD=kad_password
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - kad-network
+
   postgres:
     image: postgres:15-alpine
     container_name: kad-parser-postgres
