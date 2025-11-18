@@ -8,7 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
-from src.api.routes import analytics, auth, cases, documents, export, webhooks
+from src.api.routes import analytics, auth, cases, documents, export, plugins, webhooks
 from src.core.config import get_settings
 from src.core.logging import get_logger
 from src.web import routes as web_routes
@@ -21,7 +21,18 @@ logger = get_logger(__name__)
 async def lifespan(app: FastAPI) -> AsyncGenerator:
     """Application lifespan manager."""
     logger.info("application_starting", version="0.1.0")
+
+    # Load plugins
+    from src.plugins.manager import get_plugin_manager
+
+    plugin_manager = get_plugin_manager()
+    await plugin_manager.load_plugins()
+
     yield
+
+    # Unload plugins
+    await plugin_manager.unload_all()
+
     logger.info("application_shutting_down")
 
 
@@ -47,6 +58,7 @@ app.add_middleware(
 # Include API routers
 app.include_router(auth.router, prefix="/api")
 app.include_router(webhooks.router, prefix="/api")
+app.include_router(plugins.router, prefix="/api")
 app.include_router(cases.router, prefix="/api")
 app.include_router(documents.router, prefix="/api")
 app.include_router(analytics.router, prefix="/api")
@@ -93,6 +105,7 @@ async def api_info() -> dict:
         "endpoints": {
             "auth": "/api/auth",
             "webhooks": "/api/webhooks",
+            "plugins": "/api/plugins",
             "cases": "/api/cases",
             "documents": "/api/documents",
             "analytics": "/api/analytics",
@@ -101,6 +114,7 @@ async def api_info() -> dict:
         "features": [
             "JWT authentication and API keys",
             "Webhook notifications with retry logic",
+            "Plugin system for extensibility",
             "Full CRUD operations",
             "Advanced search and filtering",
             "Analytics and reporting",
