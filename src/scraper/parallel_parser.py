@@ -21,7 +21,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from structlog import get_logger
 
 from src.scraper.playwright_scraper import PlaywrightScraper
-from src.storage.database.base import get_db_session
+from src.storage.database.base import get_db
 from src.storage.database.models import Case
 
 logger = get_logger(__name__)
@@ -273,7 +273,7 @@ class ParallelParser:
 
         saved_count = 0
 
-        async for session in get_db_session():
+        async for session in get_db():
             try:
                 for case_dict in cases_data:
                     # Check if case already exists
