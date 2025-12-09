@@ -1,6 +1,8 @@
 """Client for interacting with KAD Arbitr internal API."""
 
 import asyncio
+import json
+from pathlib import Path
 from typing import Any, Optional
 
 import httpx
@@ -23,6 +25,7 @@ class KadArbitrClient:
         base_url: Optional[str] = None,
         timeout: Optional[int] = None,
         max_retries: Optional[int] = None,
+        cookies: Optional[dict[str, str]] = None,
     ) -> None:
         """Initialize KAD client.
 
@@ -30,11 +33,13 @@ class KadArbitrClient:
             base_url: Base URL for KAD (default from settings)
             timeout: Request timeout in seconds (default from settings)
             max_retries: Maximum number of retries (default from settings)
+            cookies: Browser cookies for bypassing protection (optional)
         """
         self.base_url = base_url or settings.kad_base_url
         self.timeout = timeout or settings.scraper_timeout
         self.max_retries = max_retries or settings.scraper_max_retries
         self.rate_limiter = get_rate_limiter()
+        self.cookies = cookies or {}
 
         self._client: Optional[httpx.AsyncClient] = None
 
@@ -60,6 +65,7 @@ class KadArbitrClient:
                     "x-date-format": "iso",  # Формат дат в ответе (из реального API)
                     "X-Requested-With": "XMLHttpRequest",  # AJAX идентификация
                 },
+                cookies=self.cookies,  # Используем cookies из браузера
                 follow_redirects=True,
             )
 
@@ -68,6 +74,44 @@ class KadArbitrClient:
         if self._client is not None:
             await self._client.aclose()
             self._client = None
+
+    @staticmethod
+    def load_cookies_from_playwright(cookies_file: str | Path) -> dict[str, str]:
+        """Load cookies from Playwright JSON file.
+
+        Args:
+            cookies_file: Path to cookies JSON file from Playwright
+
+        Returns:
+            Dictionary of cookies {name: value}
+
+        Example:
+            cookies = KadArbitrClient.load_cookies_from_playwright("/tmp/kad_cookies.json")
+            client = KadArbitrClient(cookies=cookies)
+        """
+        cookies_path = Path(cookies_file)
+        if not cookies_path.exists():
+            logger.warning(f"Cookies file not found: {cookies_path}")
+            return {}
+
+        try:
+            with open(cookies_path, "r", encoding="utf-8") as f:
+                playwright_cookies = json.load(f)
+
+            # Конвертируем Playwright формат в httpx формат
+            cookies_dict = {}
+            for cookie in playwright_cookies:
+                # Фильтруем cookies только для kad.arbitr.ru
+                domain = cookie.get("domain", "")
+                if "arbitr.ru" in domain:
+                    cookies_dict[cookie["name"]] = cookie["value"]
+
+            logger.info(f"Loaded {len(cookies_dict)} cookies from {cookies_path}")
+            return cookies_dict
+
+        except Exception as e:
+            logger.error(f"Failed to load cookies: {e}")
+            return {}
 
     async def _request_with_retry(
         self,
