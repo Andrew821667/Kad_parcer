@@ -57,8 +57,8 @@ class KadArbitrClient:
                     "User-Agent": settings.scraper_user_agent,
                     "Accept": "*/*",
                     "Content-Type": "application/json",
-                    "x-date-format": "iso",
-                    "X-Requested-With": "XMLHttpRequest",
+                    "x-date-format": "iso",  # Формат дат в ответе (из реального API)
+                    "X-Requested-With": "XMLHttpRequest",  # AJAX идентификация
                 },
                 follow_redirects=True,
             )
@@ -201,7 +201,8 @@ class KadArbitrClient:
         }
 
         if case_number:
-            payload["CaseNumbers"] = case_number
+            # CaseNumbers должен быть массивом согласно API КАД
+            payload["CaseNumbers"] = [case_number] if isinstance(case_number, str) else case_number
 
         if participant_name:
             payload["Sides"] = [
@@ -302,3 +303,80 @@ class KadArbitrClient:
         except Exception as e:
             logger.error("document_download_failed", url=document_url, error=str(e))
             raise ScraperException(f"Failed to download document: {e}") from e
+
+    async def search_by_court_and_date(
+        self,
+        court_code: str,
+        date_from: str,
+        date_to: str,
+        page: int = 1,
+        count: int = 100,
+    ) -> dict[str, Any]:
+        """Search cases by court and date range.
+
+        Args:
+            court_code: Court code (e.g., "А40", "Ф05", "09АП")
+            date_from: Start date (ISO format: "2024-01-01")
+            date_to: End date (ISO format: "2024-12-31")
+            page: Page number
+            count: Items per page (max unclear, test with 100)
+
+        Returns:
+            Search results as dict
+
+        Raises:
+            ScraperException: If search fails
+
+        Example:
+            >>> async with KadArbitrClient() as client:
+            ...     # Поиск дел АС Москвы за декабрь 2024
+            ...     results = await client.search_by_court_and_date(
+            ...         court_code="А40",
+            ...         date_from="2024-12-01",
+            ...         date_to="2024-12-31",
+            ...         count=100
+            ...     )
+            ...     print(f"Найдено дел: {results['Result']['TotalCount']}")
+        """
+        payload = {
+            "Page": page,
+            "Count": count,
+            "Courts": [court_code],
+            "DateFrom": date_from,
+            "DateTo": date_to,
+        }
+
+        logger.info(
+            "searching_by_court_and_date",
+            court=court_code,
+            date_from=date_from,
+            date_to=date_to,
+            page=page,
+        )
+
+        try:
+            response = await self._request_with_retry(
+                "POST",
+                "/Kad/SearchInstances",
+                json=payload,
+            )
+
+            data = response.json()
+            logger.info(
+                "court_date_search_complete",
+                total_count=data.get("Result", {}).get("TotalCount", 0),
+                court=court_code,
+                page=page,
+            )
+
+            return data
+
+        except Exception as e:
+            logger.error(
+                "court_date_search_failed",
+                error=str(e),
+                court=court_code,
+                date_from=date_from,
+                date_to=date_to,
+            )
+            raise ScraperException(f"Court date search failed: {e}") from e
