@@ -18,6 +18,8 @@ from bs4 import BeautifulSoup
 from playwright.async_api import Browser, Page, async_playwright
 from structlog import get_logger
 
+from src.scraper.court_names import get_court_full_name
+
 logger = get_logger(__name__)
 
 
@@ -159,24 +161,35 @@ class PlaywrightScraper:
             logger.debug("no_popup_to_close", error=str(e))
 
         # 3. Fill form
-        # Note: Using nth=X selectors based on Semendilov's working code
+        # Convert court code to full name if provided
+        court_full_name = None
+        if court_code:
+            try:
+                court_full_name = get_court_full_name(court_code)
+                logger.info("using_court_name", code=court_code, name=court_full_name)
+            except ValueError as e:
+                logger.warning("unknown_court_code", error=str(e))
+
+        # Fill form fields
+        # Note: kad.arbitr.ru form has specific field structure
         if participant:
             await self.page.fill("textarea:visible", participant)
 
         if judge:
-            await self.page.fill("input:visible", judge)
+            await self.page.fill('input[placeholder*="судь"]', judge)
 
-        if court_code:
-            # Court field is second visible input
-            await self.page.fill("input:visible >> nth=1", court_code)
+        if court_full_name:
+            # Use autocomplete for court selection
+            await self.page.fill('input[placeholder*="Суд"]', court_full_name)
+            await asyncio.sleep(0.5)  # Wait for autocomplete dropdown
+            await self.page.keyboard.press("Enter")  # Select first match
 
         if case_number:
-            # Case number field is third visible input
-            await self.page.fill("input:visible >> nth=2", case_number)
+            await self.page.fill('input[placeholder*="дела"]', case_number)
 
-        # Date fields are 4th and 5th visible inputs
-        await self.page.fill("input:visible >> nth=3", date_from_str)
-        await self.page.fill("input:visible >> nth=4", date_to_str)
+        # Date fields
+        await self.page.fill('input[placeholder*="Дата подачи с"]', date_from_str)
+        await self.page.fill('input[placeholder*="Дата подачи по"]', date_to_str)
         await self.page.keyboard.press("Tab")  # Trigger date validation
 
         await asyncio.sleep(1.2)
