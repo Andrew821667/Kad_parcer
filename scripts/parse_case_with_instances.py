@@ -130,50 +130,47 @@ async def parse_case_with_instances():
         print("=" * 80)
         print()
 
-        # КЛЮЧЕВОЙ МОМЕНТ: Иконки плюса справа от инстанций!
-        # Ищем все возможные варианты иконок раскрытия
+        # КЛЮЧЕВОЙ МОМЕНТ: Раскрывающиеся кнопки .b-collapse.js-collapse!
+        # Это DIV внутри каждого .b-chrono-item-header
         expand_buttons = await chrono_block.query_selector_all(
-            ".b-chrono-item-header button, "
-            ".b-chrono-item-header .icon, "
-            ".b-chrono-item-header svg, "
-            ".b-chrono-item-header [class*='expand'], "
-            ".b-chrono-item-header [class*='toggle'], "
-            ".b-chrono-item-header [class*='plus']"
+            ".b-collapse.js-collapse"
         )
 
-        print(f"Найдено кнопок раскрытия: {len(expand_buttons)}")
+        print(f"Найдено кнопок раскрытия: {len(expand_buttons)}\n")
 
         if len(expand_buttons) == 0:
-            # Если не нашли кнопки, пробуем кликнуть на сами заголовки
-            print("⚠️  Кнопки не найдены, пробую кликнуть на заголовки...")
-            expand_buttons = await chrono_block.query_selector_all(".b-chrono-item-header")
-
-        for i, button in enumerate(expand_buttons, 1):
-            try:
-                # Получить текст родительского блока для понимания что раскрываем
-                parent_text = ""
+            print("⚠️  ОШИБКА: Кнопки .b-collapse не найдены!")
+            print("   Проверьте структуру страницы - возможно она изменилась.\n")
+        else:
+            for i, button in enumerate(expand_buttons, 1):
                 try:
-                    parent = await button.evaluate_handle("el => el.closest('.b-chrono-item-header') || el")
-                    parent_element = parent.as_element()
-                    if parent_element:
-                        parent_text = await parent_element.inner_text()
-                except:
-                    pass
+                    # Получить название инстанции из родительского блока
+                    instance_name = ""
+                    try:
+                        parent = await button.evaluate_handle("el => el.closest('.b-chrono-item-header')")
+                        parent_element = parent.as_element()
+                        if parent_element:
+                            # Найти название инстанции (Первая инстанция, Кассационная инстанция и т.д.)
+                            instance_elem = await parent_element.query_selector(".l-col strong")
+                            if instance_elem:
+                                instance_name = await instance_elem.inner_text()
+                    except:
+                        pass
 
-                print(f"  [{i}] Раскрываю: {parent_text.strip()[:60] if parent_text else 'блок'}")
+                    print(f"  [{i}/{len(expand_buttons)}] Раскрываю: {instance_name or 'инстанцию'}")
 
-                # Скролл к кнопке
-                await button.scroll_into_view_if_needed()
-                await asyncio.sleep(0.5)
+                    # Скролл к кнопке
+                    await button.scroll_into_view_if_needed()
+                    await asyncio.sleep(0.3)
 
-                # Клик на кнопку раскрытия
-                await button.click()
-                await asyncio.sleep(2)  # Ждем раскрытия
+                    # Клик на кнопку раскрытия
+                    await button.click()
+                    await asyncio.sleep(1.5)  # Ждем раскрытия
 
-                print(f"      ✅ Кликнул")
+                    print(f"       ✅ Раскрыто")
 
-            except Exception as e:
-                print(f"      ⚠️  Ошибка: {str(e)[:60]}")
+                except Exception as e:
+                    print(f"       ⚠️  Ошибка: {str(e)[:60]}")
 
         print()
 
