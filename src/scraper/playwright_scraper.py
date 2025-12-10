@@ -1,0 +1,509 @@
+"""
+Playwright-based scraper for КАД Арбитр.
+
+This module bypasses HTTP 451 rate limiting by using real browser automation
+with form filling (not direct API calls).
+
+Based on working solutions from GitHub (Semendilov/kad-project and others).
+"""
+
+from __future__ import annotations
+
+import asyncio
+import random
+from datetime import date, datetime
+from typing import Any
+
+from bs4 import BeautifulSoup
+from playwright.async_api import Browser, Page, async_playwright
+from structlog import get_logger
+
+from src.scraper.court_names import get_court_full_name
+
+logger = get_logger(__name__)
+
+
+class PlaywrightScraper:
+    """
+    Browser-based scraper that bypasses КАД Арбитр protection.
+
+    Uses Playwright to fill web forms and parse results, avoiding HTTP 451 errors
+    that occur with direct API requests.
+    """
+
+    def __init__(
+        self,
+        headless: bool = True,
+        browser_type: str = "chromium",
+        base_delay: tuple[float, float] = (3.0, 5.0),
+        use_cdp: bool = False,
+        cdp_url: str = "http://localhost:9222",
+    ) -> None:
+        """
+        Initialize Playwright scraper.
+
+        Args:
+            headless: Run browser in headless mode
+            browser_type: Browser to use ('firefox', 'chromium', 'webkit')
+            base_delay: Min/max random delay in seconds between requests
+            use_cdp: Connect to existing Chrome via CDP (bypasses all detection)
+            cdp_url: CDP endpoint URL (default: http://localhost:9222)
+        """
+        self.headless = headless
+        self.browser_type = browser_type
+        self.base_delay = base_delay
+        self.use_cdp = use_cdp
+        self.cdp_url = cdp_url
+        self.playwright = None
+        self.browser: Browser | None = None
+        self.page: Page | None = None
+        self.context = None
+
+    async def __aenter__(self) -> PlaywrightScraper:
+        """Context manager entry."""
+        await self.start()
+        return self
+
+    async def __aexit__(self, exc_type, exc_val, exc_tb) -> None:
+        """Context manager exit."""
+        await self.close()
+
+    async def start(self) -> None:
+        """Start browser instance with anti-detection measures or connect via CDP."""
+        self.playwright = await async_playwright().start()
+
+        if self.use_cdp:
+            # Connect to existing Chrome via CDP (100% undetectable)
+            logger.info(
+                "connecting_to_chrome_via_cdp",
+                cdp_url=self.cdp_url,
+            )
+
+            self.browser = await self.playwright.chromium.connect_over_cdp(
+                self.cdp_url
+            )
+
+            # Get existing context or create new one
+            contexts = self.browser.contexts
+            if contexts:
+                self.context = contexts[0]
+                pages = self.context.pages
+                if pages:
+                    self.page = pages[0]
+                else:
+                    self.page = await self.context.new_page()
+            else:
+                self.page = await self.browser.new_page()
+
+            logger.info("connected_to_real_chrome_via_cdp")
+
+        else:
+            # Launch new browser with anti-detection
+            logger.info(
+                "starting_playwright_browser",
+                browser_type=self.browser_type,
+                headless=self.headless,
+            )
+
+            # Select browser
+            if self.browser_type == "firefox":
+                browser_launcher = self.playwright.firefox
+            elif self.browser_type == "chromium":
+                browser_launcher = self.playwright.chromium
+            elif self.browser_type == "webkit":
+                browser_launcher = self.playwright.webkit
+            else:
+                msg = f"Unknown browser type: {self.browser_type}"
+                raise ValueError(msg)
+
+            # Launch browser with args to avoid detection
+            launch_args = []
+            if self.browser_type == "chromium":
+                launch_args = [
+                    "--disable-blink-features=AutomationControlled",
+                    "--disable-dev-shm-usage",
+                    "--no-sandbox",
+                ]
+
+            self.browser = await browser_launcher.launch(
+                headless=self.headless,
+                args=launch_args if launch_args else None,
+            )
+
+            # Create context with realistic settings
+            self.context = await self.browser.new_context(
+                viewport={"width": 1920, "height": 1080},
+                user_agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+                locale="ru-RU",
+                timezone_id="Europe/Moscow",
+            )
+
+            # Create page from context
+            self.page = await self.context.new_page()
+
+            # Hide automation markers
+            await self.page.add_init_script("""
+                // Hide webdriver property
+                Object.defineProperty(navigator, 'webdriver', {
+                    get: () => undefined
+                });
+
+                // Mock plugins
+                Object.defineProperty(navigator, 'plugins', {
+                    get: () => [1, 2, 3, 4, 5]
+                });
+
+                // Mock languages
+                Object.defineProperty(navigator, 'languages', {
+                    get: () => ['ru-RU', 'ru', 'en-US', 'en']
+                });
+
+                // Override permissions
+                const originalQuery = window.navigator.permissions.query;
+                window.navigator.permissions.query = (parameters) => (
+                    parameters.name === 'notifications' ?
+                        Promise.resolve({ state: Notification.permission }) :
+                        originalQuery(parameters)
+                );
+
+                // Mock chrome object for non-Chrome browsers
+                if (!window.chrome) {
+                    window.chrome = {
+                        runtime: {}
+                    };
+                }
+            """)
+
+            logger.info("playwright_browser_started_with_stealth")
+
+    async def close(self) -> None:
+        """Close browser and cleanup."""
+        if self.page:
+            await self.page.close()
+        if self.browser:
+            await self.browser.close()
+        if self.playwright:
+            await self.playwright.stop()
+
+        logger.info("playwright_browser_closed")
+
+    async def _random_delay(self) -> None:
+        """Random delay to mimic human behavior and avoid rate limiting."""
+        delay = random.uniform(*self.base_delay)
+        logger.debug("applying_delay", delay_seconds=delay)
+        await asyncio.sleep(delay)
+
+    async def search_by_court_and_date(
+        self,
+        court_code: str,
+        date_from: date | str,
+        date_to: date | str,
+        participant: str = "",
+        judge: str = "",
+        case_number: str = "",
+    ) -> list[dict[str, Any]]:
+        """
+        Search cases by court and date range using web form.
+
+        Args:
+            court_code: Court code (e.g. 'А40', 'А41')
+            date_from: Start date (YYYY-MM-DD or DD.MM.YYYY)
+            date_to: End date (YYYY-MM-DD or DD.MM.YYYY)
+            participant: Participant name (optional)
+            judge: Judge name (optional)
+            case_number: Case number (optional)
+
+        Returns:
+            List of case dictionaries
+
+        Raises:
+            RuntimeError: If browser not started
+        """
+        if not self.page:
+            msg = "Browser not started. Call start() first or use context manager."
+            raise RuntimeError(msg)
+
+        # Format dates
+        date_from_str = self._format_date(date_from)
+        date_to_str = self._format_date(date_to)
+
+        logger.info(
+            "searching_cases",
+            court_code=court_code,
+            date_from=date_from_str,
+            date_to=date_to_str,
+            participant=participant,
+            judge=judge,
+            case_number=case_number,
+        )
+
+        # 1. Navigate to КАД Арбитр
+        await self.page.goto("https://kad.arbitr.ru", wait_until="networkidle")
+        await asyncio.sleep(2)
+
+        # 2. Close popup if present
+        try:
+            await self.page.keyboard.press("Escape")
+            await asyncio.sleep(1)
+        except Exception as e:
+            logger.debug("no_popup_to_close", error=str(e))
+
+        # 3. Fill form
+        # Convert court code to full name if provided
+        court_full_name = None
+        if court_code:
+            try:
+                court_full_name = get_court_full_name(court_code)
+                logger.info("using_court_name", code=court_code, name=court_full_name)
+            except ValueError as e:
+                logger.warning("unknown_court_code", error=str(e))
+
+        # Fill form fields using actual placeholders from kad.arbitr.ru
+        if participant:
+            await self.page.fill('textarea[placeholder="название, ИНН или ОГРН"]', participant)
+
+        if judge:
+            await self.page.fill('input[placeholder="фамилия судьи"]', judge)
+
+        if court_full_name:
+            # Court field with autocomplete
+            await self.page.fill('input[placeholder="название суда"]', court_full_name)
+            await asyncio.sleep(0.5)  # Wait for autocomplete dropdown
+            await self.page.keyboard.press("Enter")  # Select first match
+
+        if case_number:
+            await self.page.fill('input[placeholder="например, А50-5568/08"]', case_number)
+
+        # Date fields - click before fill to avoid calendar issues
+        date_inputs = await self.page.query_selector_all('input[placeholder="дд.мм.гггг"]')
+        if len(date_inputs) >= 2:
+            # Fill first date: click -> fill -> wait
+            await date_inputs[0].click()  # Focus on first field
+            await asyncio.sleep(0.2)
+            await date_inputs[0].fill(date_from_str)
+            await asyncio.sleep(0.5)
+
+            # Fill second date: click on second field (closes first calendar) -> fill -> wait
+            await date_inputs[1].click()  # Focus on second field (closes first calendar)
+            await asyncio.sleep(0.2)
+            await date_inputs[1].fill(date_to_str)
+            await asyncio.sleep(0.5)
+
+        # Close second calendar by clicking elsewhere
+        await self.page.click("body")
+        await asyncio.sleep(0.5)
+
+        # 4. Submit form
+        await self.page.click("#b-form-submit")  # Use # for ID selector
+
+        # 5. Wait for results
+        await self._random_delay()
+
+        # 6. Get total pages count
+        try:
+            total_pages_input = await self.page.query_selector("input#documentsPagesCount")
+            if not total_pages_input:
+                logger.warning("no_results_found")
+                return []
+
+            total_pages_str = await total_pages_input.get_attribute("value")
+            total_pages = int(total_pages_str) if total_pages_str else 0
+
+            logger.info("found_pages", total_pages=total_pages)
+        except Exception as e:
+            logger.error("failed_to_get_pages_count", error=str(e))
+            return []
+
+        # 7. Parse all pages
+        results = []
+        for page_num in range(1, total_pages + 1):
+            # Navigate to page (skip for first page)
+            if page_num > 1:
+                try:
+                    # Click on pagination link (tested: works with 5 sec wait)
+                    link = await self.page.query_selector(f'a[href="#page{page_num}"]')
+                    if not link:
+                        logger.error("pagination_link_not_found", page=page_num)
+                        continue
+
+                    await link.click()
+
+                    # Wait for table to reload (5 seconds required based on testing)
+                    await asyncio.sleep(5)
+
+                    logger.debug("navigated_to_page", page=page_num)
+                except Exception as e:
+                    logger.error("failed_to_navigate_to_page", page=page_num, error=str(e))
+                    continue
+
+            # Parse current page
+            try:
+                page_cases = await self._parse_current_page()
+                results.extend(page_cases)
+                logger.info("parsed_page", page=page_num, cases_count=len(page_cases))
+            except Exception as e:
+                logger.error("failed_to_parse_page", page=page_num, error=str(e))
+
+        logger.info(
+            "search_completed",
+            court_code=court_code,
+            total_cases=len(results),
+        )
+
+        return results
+
+    async def _parse_current_page(self) -> list[dict[str, Any]]:
+        """
+        Parse cases table from current page.
+
+        Returns:
+            List of case dictionaries
+        """
+        if not self.page:
+            return []
+
+        # Get table HTML
+        try:
+            table = await self.page.query_selector("table#b-cases")
+            if not table:
+                logger.warning("table_not_found")
+                return []
+
+            table_html = await table.inner_html()
+        except Exception as e:
+            logger.error("failed_to_get_table_html", error=str(e))
+            return []
+
+        # Parse with BeautifulSoup
+        return self._parse_table_html(table_html)
+
+    def _parse_table_html(self, html: str) -> list[dict[str, Any]]:
+        """
+        Parse cases from HTML table.
+
+        Args:
+            html: Table HTML
+
+        Returns:
+            List of case dictionaries
+        """
+        soup = BeautifulSoup(html, "lxml")
+        rows = soup.find_all("tr")
+
+        results = []
+        for row in rows:
+            try:
+                # Column 1: Case number, date, URL
+                num_td = row.find("td", class_="num")
+                if not num_td:
+                    continue
+
+                # Extract case type (civil, administrative, etc.)
+                type_div = num_td.find("div", class_=True)
+                case_type = type_div.get("class", ["unknown"])[0] if type_div else "unknown"
+
+                # Extract date from span inside civil/administrative div
+                date_span = num_td.find("span")
+                case_date = date_span.text.strip() if date_span else ""
+
+                # Extract case number from link
+                case_link = num_td.find("a", class_="num_case")
+                if not case_link:
+                    continue
+
+                case_number = case_link.text.strip()
+                case_url = case_link.get("href", "")
+
+                # Column 2: Judge and Court
+                court_td = row.find("td", class_="court")
+                judge = ""
+                court = ""
+
+                if court_td:
+                    # Extract judge
+                    judge_div = court_td.find("div", class_="judge")
+                    if judge_div:
+                        judge = judge_div.text.strip()
+
+                    # Extract court (second div without class='judge')
+                    all_divs = court_td.find_all("div", recursive=False)
+                    if len(all_divs) > 0:
+                        # Get the b-container div
+                        container = all_divs[0]
+                        inner_divs = container.find_all("div", recursive=False)
+                        # Court is the div that doesn't have class='judge'
+                        for div in inner_divs:
+                            if "judge" not in div.get("class", []):
+                                court = div.text.strip()
+                                break
+
+                # Column 3: Plaintiff
+                plaintiff_td = row.find("td", class_="plaintiff")
+                plaintiff = ""
+                if plaintiff_td:
+                    # Try to get the main visible text (not from rolloverHtml)
+                    rollover_span = plaintiff_td.find("span", class_="js-rollover")
+                    if rollover_span:
+                        # Get text but exclude the hidden js-rolloverHtml span
+                        for hidden in rollover_span.find_all("span", class_="js-rolloverHtml"):
+                            hidden.extract()  # Remove hidden span from tree
+                        plaintiff = rollover_span.text.strip()
+
+                # Column 4: Respondent(s)
+                respondent_td = row.find("td", class_="respondent")
+                respondents = []
+                if respondent_td:
+                    rollover_spans = respondent_td.find_all("span", class_="js-rollover")
+                    for rollover_span in rollover_spans:
+                        # Get text but exclude the hidden js-rolloverHtml span
+                        for hidden in rollover_span.find_all("span", class_="js-rolloverHtml"):
+                            hidden.extract()
+                        resp_text = rollover_span.text.strip()
+                        if resp_text:
+                            respondents.append(resp_text)
+
+                # Build result dictionary
+                case_data = {
+                    "case_type": case_type,
+                    "case_number": case_number,
+                    "case_date": case_date,
+                    "url": case_url,
+                    "judge": judge,
+                    "court": court,
+                    "plaintiff": plaintiff,
+                    "respondents": respondents,
+                }
+
+                results.append(case_data)
+
+            except Exception as e:
+                logger.warning("failed_to_parse_row", error=str(e))
+                continue
+
+        return results
+
+    @staticmethod
+    def _format_date(d: date | str) -> str:
+        """
+        Format date to DD.MM.YYYY for КАД Арбитр form.
+
+        Args:
+            d: Date object or string (YYYY-MM-DD or DD.MM.YYYY)
+
+        Returns:
+            Date string in DD.MM.YYYY format
+        """
+        if isinstance(d, date):
+            return d.strftime("%d.%m.%Y")
+
+        # If already in DD.MM.YYYY format
+        if "." in d:
+            return d
+
+        # If in YYYY-MM-DD format
+        try:
+            dt = datetime.strptime(d, "%Y-%m-%d")
+            return dt.strftime("%d.%m.%Y")
+        except ValueError:
+            # Return as-is if can't parse
+            return d

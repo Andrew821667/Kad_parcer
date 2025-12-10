@@ -1,6 +1,8 @@
 """Client for interacting with KAD Arbitr internal API."""
 
 import asyncio
+import json
+from pathlib import Path
 from typing import Any, Optional
 
 import httpx
@@ -23,6 +25,7 @@ class KadArbitrClient:
         base_url: Optional[str] = None,
         timeout: Optional[int] = None,
         max_retries: Optional[int] = None,
+        cookies: Optional[dict[str, str]] = None,
     ) -> None:
         """Initialize KAD client.
 
@@ -30,11 +33,13 @@ class KadArbitrClient:
             base_url: Base URL for KAD (default from settings)
             timeout: Request timeout in seconds (default from settings)
             max_retries: Maximum number of retries (default from settings)
+            cookies: Browser cookies for bypassing protection (optional)
         """
         self.base_url = base_url or settings.kad_base_url
         self.timeout = timeout or settings.scraper_timeout
         self.max_retries = max_retries or settings.scraper_max_retries
         self.rate_limiter = get_rate_limiter()
+        self.cookies = cookies or {}
 
         self._client: Optional[httpx.AsyncClient] = None
 
@@ -57,9 +62,10 @@ class KadArbitrClient:
                     "User-Agent": settings.scraper_user_agent,
                     "Accept": "*/*",
                     "Content-Type": "application/json",
-                    "x-date-format": "iso",
-                    "X-Requested-With": "XMLHttpRequest",
+                    "x-date-format": "iso",  # Формат дат в ответе (из реального API)
+                    "X-Requested-With": "XMLHttpRequest",  # AJAX идентификация
                 },
+                cookies=self.cookies,  # Используем cookies из браузера
                 follow_redirects=True,
             )
 
@@ -68,6 +74,44 @@ class KadArbitrClient:
         if self._client is not None:
             await self._client.aclose()
             self._client = None
+
+    @staticmethod
+    def load_cookies_from_playwright(cookies_file: str | Path) -> dict[str, str]:
+        """Load cookies from Playwright JSON file.
+
+        Args:
+            cookies_file: Path to cookies JSON file from Playwright
+
+        Returns:
+            Dictionary of cookies {name: value}
+
+        Example:
+            cookies = KadArbitrClient.load_cookies_from_playwright("/tmp/kad_cookies.json")
+            client = KadArbitrClient(cookies=cookies)
+        """
+        cookies_path = Path(cookies_file)
+        if not cookies_path.exists():
+            logger.warning(f"Cookies file not found: {cookies_path}")
+            return {}
+
+        try:
+            with open(cookies_path, "r", encoding="utf-8") as f:
+                playwright_cookies = json.load(f)
+
+            # Конвертируем Playwright формат в httpx формат
+            cookies_dict = {}
+            for cookie in playwright_cookies:
+                # Фильтруем cookies только для kad.arbitr.ru
+                domain = cookie.get("domain", "")
+                if "arbitr.ru" in domain:
+                    cookies_dict[cookie["name"]] = cookie["value"]
+
+            logger.info(f"Loaded {len(cookies_dict)} cookies from {cookies_path}")
+            return cookies_dict
+
+        except Exception as e:
+            logger.error(f"Failed to load cookies: {e}")
+            return {}
 
     async def _request_with_retry(
         self,
@@ -201,7 +245,8 @@ class KadArbitrClient:
         }
 
         if case_number:
-            payload["CaseNumbers"] = case_number
+            # CaseNumbers должен быть массивом согласно API КАД
+            payload["CaseNumbers"] = [case_number] if isinstance(case_number, str) else case_number
 
         if participant_name:
             payload["Sides"] = [
@@ -302,3 +347,80 @@ class KadArbitrClient:
         except Exception as e:
             logger.error("document_download_failed", url=document_url, error=str(e))
             raise ScraperException(f"Failed to download document: {e}") from e
+
+    async def search_by_court_and_date(
+        self,
+        court_code: str,
+        date_from: str,
+        date_to: str,
+        page: int = 1,
+        count: int = 100,
+    ) -> dict[str, Any]:
+        """Search cases by court and date range.
+
+        Args:
+            court_code: Court code (e.g., "А40", "Ф05", "09АП")
+            date_from: Start date (ISO format: "2024-01-01")
+            date_to: End date (ISO format: "2024-12-31")
+            page: Page number
+            count: Items per page (max unclear, test with 100)
+
+        Returns:
+            Search results as dict
+
+        Raises:
+            ScraperException: If search fails
+
+        Example:
+            >>> async with KadArbitrClient() as client:
+            ...     # Поиск дел АС Москвы за декабрь 2024
+            ...     results = await client.search_by_court_and_date(
+            ...         court_code="А40",
+            ...         date_from="2024-12-01",
+            ...         date_to="2024-12-31",
+            ...         count=100
+            ...     )
+            ...     print(f"Найдено дел: {results['Result']['TotalCount']}")
+        """
+        payload = {
+            "Page": page,
+            "Count": count,
+            "Courts": [court_code],
+            "DateFrom": date_from,
+            "DateTo": date_to,
+        }
+
+        logger.info(
+            "searching_by_court_and_date",
+            court=court_code,
+            date_from=date_from,
+            date_to=date_to,
+            page=page,
+        )
+
+        try:
+            response = await self._request_with_retry(
+                "POST",
+                "/Kad/SearchInstances",
+                json=payload,
+            )
+
+            data = response.json()
+            logger.info(
+                "court_date_search_complete",
+                total_count=data.get("Result", {}).get("TotalCount", 0),
+                court=court_code,
+                page=page,
+            )
+
+            return data
+
+        except Exception as e:
+            logger.error(
+                "court_date_search_failed",
+                error=str(e),
+                court=court_code,
+                date_from=date_from,
+                date_to=date_to,
+            )
+            raise ScraperException(f"Court date search failed: {e}") from e
