@@ -29,8 +29,21 @@ async def analyze_expandable_sections():
     with open(cases_file, encoding="utf-8") as f:
         all_cases = json.load(f)
 
-    # Взять первое дело с несколькими актами
-    case = all_cases[0]
+    # Найти дело с несколькими PDF (вероятно несколько инстанций)
+    suitable_cases = []
+    for c in all_cases:
+        # Пропустить СИП (Суд по интеллектуальным правам)
+        if c['case_number'].startswith('СИП'):
+            continue
+        # Взять арбитражные суды
+        if c['case_number'].startswith('А'):
+            suitable_cases.append(c)
+
+    if not suitable_cases:
+        print("❌ Не найдено подходящих дел (арбитражные суды)")
+        return
+
+    case = suitable_cases[0]
 
     # Нормализовать URL
     case_url = case['url']
