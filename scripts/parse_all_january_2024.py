@@ -178,10 +178,23 @@ async def parse_all_january_2024():
 
             try:
                 # Открыть страницу дела
-                # Проверить, не является ли URL уже абсолютным
+                # Очистить и нормализовать URL
                 case_url = case['url']
-                if not case_url.startswith('http'):
-                    case_url = f"https://kad.arbitr.ru{case_url}"
+
+                # Удалить любые префиксы домена (даже некорректные)
+                case_url = case_url.replace('https//kad.arbitr.ru', '')
+                case_url = case_url.replace('http//kad.arbitr.ru', '')
+                case_url = case_url.replace('//kad.arbitr.ru', '')
+                case_url = case_url.replace('https://kad.arbitr.ru', '')
+                case_url = case_url.replace('http://kad.arbitr.ru', '')
+
+                # Убедиться что начинается с /
+                if not case_url.startswith('/'):
+                    case_url = '/' + case_url
+
+                # Создать правильный полный URL
+                case_url = f"https://kad.arbitr.ru{case_url}"
+
                 await scraper.page.goto(case_url, wait_until="networkidle", timeout=30000)
                 await asyncio.sleep(2)
 
