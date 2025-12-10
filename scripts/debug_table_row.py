@@ -28,10 +28,45 @@ async def main():
 
         print("✅ Подключено к Chrome\n")
 
+        # Do search
+        print("🔍 Выполняю поиск за январь 2024...\n")
+
+        await page.goto("https://kad.arbitr.ru", wait_until="networkidle")
+        await asyncio.sleep(2)
+
+        # Close popup
+        try:
+            await page.keyboard.press("Escape")
+            await asyncio.sleep(1)
+        except Exception:
+            pass
+
+        # Fill dates
+        date_inputs = await page.query_selector_all('input[placeholder="дд.мм.гггг"]')
+        if len(date_inputs) >= 2:
+            await date_inputs[0].click()
+            await asyncio.sleep(0.2)
+            await date_inputs[0].fill("01.01.2024")
+            await asyncio.sleep(0.5)
+
+            await date_inputs[1].click()
+            await asyncio.sleep(0.2)
+            await date_inputs[1].fill("31.01.2024")
+            await asyncio.sleep(0.5)
+
+        await page.click("body")
+        await asyncio.sleep(0.5)
+
+        # Submit
+        await page.click("#b-form-submit")
+        await asyncio.sleep(5)
+
+        print("✅ Поиск выполнен\n")
+
         # Get table
         table = await page.query_selector("table#b-cases")
         if not table:
-            print("❌ Таблица не найдена. Сначала выполните поиск!")
+            print("❌ Таблица не найдена!")
             return
 
         # Get first data row (skip header)
