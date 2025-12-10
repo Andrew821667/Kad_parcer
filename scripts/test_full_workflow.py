@@ -137,45 +137,79 @@ async def test_full_workflow():
                 print(f"   ✓ Страница дела открыта")
 
                 # Look for document download links
-                # Common patterns on kad.arbitr.ru:
-                # - Links with text "Судебный акт"
-                # - Links to PDF files
-                # - Download buttons
-
-                # Try to find document links
+                # Try multiple selectors
                 doc_links = await scraper.page.query_selector_all(
-                    'a[href*=".pdf"], a:has-text("Судебный акт"), a:has-text("Скачать"), a.btn-download'
+                    'a[href*="PdfDocument"], a[href*=".pdf"]'
                 )
 
                 if not doc_links:
-                    print(f"   ⚠️  Не найдены ссылки на документы")
+                    print(f"   ⚠️  Не найдены ссылки на PDF документы")
                     continue
 
                 print(f"   Найдено ссылок на документы: {len(doc_links)}")
 
-                # Try to download first document
+                # Get first link
                 first_link = doc_links[0]
                 link_text = await first_link.inner_text()
-                link_href = await first_link.get_attribute("href")
+                pdf_url = await first_link.get_attribute("href")
 
-                print(f"   Пытаюсь скачать: {link_text[:50]} ({link_href[:50]}...)")
+                # Make URL absolute if needed
+                if pdf_url and not pdf_url.startswith("http"):
+                    pdf_url = f"https://kad.arbitr.ru{pdf_url}"
 
-                # Setup download event listener
-                async with scraper.page.expect_download(timeout=30000) as download_info:
-                    await first_link.click()
+                print(f"   Документ: {link_text[:50]}")
+                print(f"   URL: {pdf_url[:80]}...")
 
-                download = await download_info.value
+                # Method 1: Try to download via context (preserves cookies/auth)
+                try:
+                    # Navigate to PDF URL - this might open PDF in browser
+                    response = await scraper.page.goto(pdf_url, wait_until="load", timeout=30000)
 
-                # Save file
-                filename = f"{case['case_number'].replace('/', '_')}_{download.suggested_filename}"
-                filepath = downloads_dir / filename
+                    if response and response.ok:
+                        # Get content
+                        pdf_content = await response.body()
 
-                await download.save_as(str(filepath))
+                        # Save file
+                        filename = f"{case['case_number'].replace('/', '_')}.pdf"
+                        filepath = downloads_dir / filename
 
-                file_size = filepath.stat().st_size if filepath.exists() else 0
+                        filepath.write_bytes(pdf_content)
+                        file_size = len(pdf_content)
 
-                print(f"   ✅ Скачан: {filename} ({file_size} bytes)")
-                downloaded_count += 1
+                        print(f"   ✅ Скачан: {filename} ({file_size} bytes)")
+                        downloaded_count += 1
+
+                        # Go back to case page for next iteration
+                        await scraper.page.go_back(wait_until="networkidle")
+                        await asyncio.sleep(1)
+
+                    else:
+                        print(f"   ❌ Не удалось загрузить PDF (status: {response.status if response else 'none'})")
+
+                except Exception as download_error:
+                    print(f"   ❌ Ошибка скачивания: {download_error}")
+
+                    # Try method 2: Use print button
+                    try:
+                        print(f"   Пробую альтернативный метод (печать)...")
+
+                        # Go back to case page if we're on PDF
+                        await scraper.page.goto(case["url"], wait_until="networkidle")
+                        await asyncio.sleep(2)
+
+                        # Generate PDF from page using print
+                        filename = f"{case['case_number'].replace('/', '_')}_print.pdf"
+                        filepath = downloads_dir / filename
+
+                        await scraper.page.pdf(path=str(filepath))
+
+                        file_size = filepath.stat().st_size if filepath.exists() else 0
+                        print(f"   ✅ Скачан (печать): {filename} ({file_size} bytes)")
+                        downloaded_count += 1
+
+                    except Exception as print_error:
+                        print(f"   ❌ Ошибка печати: {print_error}")
+                        continue
 
             except Exception as e:
                 print(f"   ❌ Ошибка: {e}")
