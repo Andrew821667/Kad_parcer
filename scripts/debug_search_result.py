@@ -13,8 +13,60 @@ async def main():
     print("🔍 Отладка поиска на kad.arbitr.ru...\n")
 
     async with async_playwright() as p:
-        browser = await p.firefox.launch(headless=False, slow_mo=1000)  # Slow motion!
-        page = await browser.new_page()
+        # Launch browser with anti-detection
+        browser = await p.chromium.launch(
+            headless=False,
+            slow_mo=1000,  # Slow motion!
+            args=[
+                "--disable-blink-features=AutomationControlled",
+                "--disable-dev-shm-usage",
+                "--no-sandbox",
+            ],
+        )
+
+        # Create context with realistic settings
+        context = await browser.new_context(
+            viewport={"width": 1920, "height": 1080},
+            user_agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            locale="ru-RU",
+            timezone_id="Europe/Moscow",
+        )
+
+        # Create page from context
+        page = await context.new_page()
+
+        # Hide automation markers
+        await page.add_init_script("""
+            // Hide webdriver property
+            Object.defineProperty(navigator, 'webdriver', {
+                get: () => undefined
+            });
+
+            // Mock plugins
+            Object.defineProperty(navigator, 'plugins', {
+                get: () => [1, 2, 3, 4, 5]
+            });
+
+            // Mock languages
+            Object.defineProperty(navigator, 'languages', {
+                get: () => ['ru-RU', 'ru', 'en-US', 'en']
+            });
+
+            // Override permissions
+            const originalQuery = window.navigator.permissions.query;
+            window.navigator.permissions.query = (parameters) => (
+                parameters.name === 'notifications' ?
+                    Promise.resolve({ state: Notification.permission }) :
+                    originalQuery(parameters)
+            );
+
+            // Mock chrome object
+            if (!window.chrome) {
+                window.chrome = {
+                    runtime: {}
+                };
+            }
+        """)
 
         # Navigate
         await page.goto("https://kad.arbitr.ru", wait_until="networkidle")

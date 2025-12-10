@@ -62,7 +62,7 @@ class PlaywrightScraper:
         await self.close()
 
     async def start(self) -> None:
-        """Start browser instance."""
+        """Start browser instance with anti-detection measures."""
         logger.info(
             "starting_playwright_browser",
             browser_type=self.browser_type,
@@ -82,11 +82,65 @@ class PlaywrightScraper:
             msg = f"Unknown browser type: {self.browser_type}"
             raise ValueError(msg)
 
-        # Launch browser
-        self.browser = await browser_launcher.launch(headless=self.headless)
-        self.page = await self.browser.new_page()
+        # Launch browser with args to avoid detection
+        launch_args = []
+        if self.browser_type == "chromium":
+            launch_args = [
+                "--disable-blink-features=AutomationControlled",
+                "--disable-dev-shm-usage",
+                "--no-sandbox",
+            ]
 
-        logger.info("playwright_browser_started")
+        self.browser = await browser_launcher.launch(
+            headless=self.headless,
+            args=launch_args if launch_args else None,
+        )
+
+        # Create context with realistic settings
+        context = await self.browser.new_context(
+            viewport={"width": 1920, "height": 1080},
+            user_agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            locale="ru-RU",
+            timezone_id="Europe/Moscow",
+        )
+
+        # Create page from context
+        self.page = await context.new_page()
+
+        # Hide automation markers
+        await self.page.add_init_script("""
+            // Hide webdriver property
+            Object.defineProperty(navigator, 'webdriver', {
+                get: () => undefined
+            });
+
+            // Mock plugins
+            Object.defineProperty(navigator, 'plugins', {
+                get: () => [1, 2, 3, 4, 5]
+            });
+
+            // Mock languages
+            Object.defineProperty(navigator, 'languages', {
+                get: () => ['ru-RU', 'ru', 'en-US', 'en']
+            });
+
+            // Override permissions
+            const originalQuery = window.navigator.permissions.query;
+            window.navigator.permissions.query = (parameters) => (
+                parameters.name === 'notifications' ?
+                    Promise.resolve({ state: Notification.permission }) :
+                    originalQuery(parameters)
+            );
+
+            // Mock chrome object for non-Chrome browsers
+            if (!window.chrome) {
+                window.chrome = {
+                    runtime: {}
+                };
+            }
+        """)
+
+        logger.info("playwright_browser_started_with_stealth")
 
     async def close(self) -> None:
         """Close browser and cleanup."""
