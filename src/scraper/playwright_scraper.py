@@ -320,8 +320,18 @@ class PlaywrightScraper:
             # Navigate to page (skip for first page)
             if page_num > 1:
                 try:
-                    await self.page.click(f'id=pages >> a[href="#page{page_num}"]')
-                    await self._random_delay()
+                    # Click on pagination link (tested: works with 5 sec wait)
+                    link = await self.page.query_selector(f'a[href="#page{page_num}"]')
+                    if not link:
+                        logger.error("pagination_link_not_found", page=page_num)
+                        continue
+
+                    await link.click()
+
+                    # Wait for table to reload (5 seconds required based on testing)
+                    await asyncio.sleep(5)
+
+                    logger.debug("navigated_to_page", page=page_num)
                 except Exception as e:
                     logger.error("failed_to_navigate_to_page", page=page_num, error=str(e))
                     continue
