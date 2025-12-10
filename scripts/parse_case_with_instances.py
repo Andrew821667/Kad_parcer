@@ -122,36 +122,65 @@ async def parse_case_with_instances():
             print()
 
         # ================================================================
-        # 3. РАСКРЫТЬ ВСЕ БЛОКИ (если они свернуты)
+        # 3. РАСКРЫТЬ ВСЕ БЛОКИ ИНСТАНЦИЙ
         # ================================================================
 
         print("=" * 80)
-        print("ШАГ 3: Раскрытие всех блоков")
+        print("ШАГ 3: Раскрытие блоков инстанций")
         print("=" * 80)
         print()
 
-        # Найти все кликабельные заголовки/кнопки раскрытия
-        expandable = await scraper.page.query_selector_all(
-            "button.expand, button.toggle, a.toggle, [data-toggle], .collapsible-header, h2[onclick], h3[onclick]"
+        # КЛЮЧЕВОЙ МОМЕНТ: Иконки плюса справа от инстанций!
+        # Ищем все возможные варианты иконок раскрытия
+        expand_buttons = await chrono_block.query_selector_all(
+            ".b-chrono-item-header button, "
+            ".b-chrono-item-header .icon, "
+            ".b-chrono-item-header svg, "
+            ".b-chrono-item-header [class*='expand'], "
+            ".b-chrono-item-header [class*='toggle'], "
+            ".b-chrono-item-header [class*='plus']"
         )
 
-        print(f"Найдено раскрывающихся элементов: {len(expandable)}")
+        print(f"Найдено кнопок раскрытия: {len(expand_buttons)}")
 
-        for i, el in enumerate(expandable, 1):
+        if len(expand_buttons) == 0:
+            # Если не нашли кнопки, пробуем кликнуть на сами заголовки
+            print("⚠️  Кнопки не найдены, пробую кликнуть на заголовки...")
+            expand_buttons = await chrono_block.query_selector_all(".b-chrono-item-header")
+
+        for i, button in enumerate(expand_buttons, 1):
             try:
-                text = await el.inner_text()
-                print(f"  [{i}] Раскрываю: {text.strip()[:40]}")
+                # Получить текст родительского блока для понимания что раскрываем
+                parent_text = ""
+                try:
+                    parent = await button.evaluate_handle("el => el.closest('.b-chrono-item-header') || el")
+                    parent_element = parent.as_element()
+                    if parent_element:
+                        parent_text = await parent_element.inner_text()
+                except:
+                    pass
 
-                await el.scroll_into_view_if_needed()
-                await asyncio.sleep(0.3)
-                await el.click()
-                await asyncio.sleep(1)
+                print(f"  [{i}] Раскрываю: {parent_text.strip()[:60] if parent_text else 'блок'}")
 
-                print(f"      ✅ Раскрыто")
+                # Скролл к кнопке
+                await button.scroll_into_view_if_needed()
+                await asyncio.sleep(0.5)
+
+                # Клик на кнопку раскрытия
+                await button.click()
+                await asyncio.sleep(2)  # Ждем раскрытия
+
+                print(f"      ✅ Кликнул")
+
             except Exception as e:
-                print(f"      ⚠️  Ошибка: {str(e)[:50]}")
+                print(f"      ⚠️  Ошибка: {str(e)[:60]}")
 
         print()
+
+        # Дополнительная пауза чтобы все блоки успели раскрыться
+        print("⏳ Ожидание полного раскрытия всех блоков...")
+        await asyncio.sleep(3)
+        print("✅ Все блоки раскрыты\n")
 
         # ================================================================
         # 4. СКАЧАТЬ ВСЕ PDF ИЗ ВСЕХ ИНСТАНЦИЙ
