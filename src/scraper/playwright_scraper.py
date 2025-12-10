@@ -191,12 +191,17 @@ class PlaywrightScraper:
         if len(date_inputs) >= 2:
             await date_inputs[0].fill(date_from_str)  # First date field (from)
             await date_inputs[1].fill(date_to_str)    # Second date field (to)
-        await self.page.keyboard.press("Tab")  # Trigger date validation
 
-        await asyncio.sleep(1.2)
+        # Close date picker by clicking elsewhere or pressing Escape
+        await self.page.keyboard.press("Escape")  # Close datepicker popup
+        await asyncio.sleep(0.5)
+
+        # Click somewhere safe to ensure datepicker is closed
+        await self.page.click("body")  # Click on body to dismiss any popups
+        await asyncio.sleep(0.5)
 
         # 4. Submit form
-        await self.page.click("id=b-form-submit")
+        await self.page.click("#b-form-submit")  # Use # for ID selector
 
         # 5. Wait for results
         await self._random_delay()

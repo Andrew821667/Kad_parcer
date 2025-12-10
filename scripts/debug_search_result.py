@@ -42,20 +42,27 @@ async def main():
 
         await asyncio.sleep(1)
 
+        # Close datepicker
+        print("\n2. Закрываю календарь...")
+        await page.keyboard.press("Escape")
+        await asyncio.sleep(0.5)
+        await page.click("body")  # Click somewhere safe
+        await asyncio.sleep(0.5)
+
         # Click submit
-        print("\n2. Нажимаю кнопку 'Найти'...")
+        print("\n3. Нажимаю кнопку 'Найти'...")
         await page.click("#b-form-submit")
 
         # Wait for page to load
-        print("\n3. Жду загрузки результатов (10 секунд)...")
+        print("\n4. Жду загрузки результатов (10 секунд)...")
         await asyncio.sleep(10)
 
         # Check URL
         current_url = page.url
-        print(f"\n4. Текущий URL: {current_url}")
+        print(f"\n5. Текущий URL: {current_url}")
 
         # Check for results table
-        print("\n5. Проверяю наличие таблицы результатов...")
+        print("\n6. Проверяю наличие таблицы результатов...")
         table = await page.query_selector("table#b-cases")
         if table:
             print("   ✓ Таблица найдена: table#b-cases")
@@ -72,7 +79,7 @@ async def main():
             print("   ✗ Таблица НЕ найдена!")
 
         # Check for pagination
-        print("\n6. Проверяю пагинацию...")
+        print("\n7. Проверяю пагинацию...")
         pages_input = await page.query_selector("input#documentsPagesCount")
         if pages_input:
             value = await pages_input.get_attribute("value")
@@ -91,7 +98,7 @@ async def main():
                 print(f"   {html[:200]}...")
 
         # Check for "no results" message
-        print("\n7. Проверяю сообщение 'ничего не найдено'...")
+        print("\n8. Проверяю сообщение 'ничего не найдено'...")
         no_results = await page.query_selector(".no-result, .b-nothing-found")
         if no_results:
             text = await no_results.text_content()
@@ -100,7 +107,7 @@ async def main():
             print("   ✓ Сообщения об отсутствии результатов нет")
 
         # Save HTML for inspection
-        print("\n8. Сохраняю HTML страницы результатов...")
+        print("\n9. Сохраняю HTML страницы результатов...")
         html = await page.content()
         with open("/tmp/kad_search_results.html", "w", encoding="utf-8") as f:
             f.write(html)
