@@ -31,7 +31,24 @@ async def analyze_expandable_sections():
 
     # Взять первое дело с несколькими актами
     case = all_cases[0]
-    case_url = f"https://kad.arbitr.ru{case['url']}"
+
+    # Нормализовать URL
+    case_url = case['url']
+    # Удалить любые префиксы домена (даже некорректные)
+    case_url = case_url.replace('https//kad.arbitr.ru', '')
+    case_url = case_url.replace('http//kad.arbitr.ru', '')
+    case_url = case_url.replace('//kad.arbitr.ru', '')
+    case_url = case_url.replace('https://kad.arbitr.ru', '')
+    case_url = case_url.replace('http://kad.arbitr.ru', '')
+    case_url = case_url.replace('https:/', '')
+    case_url = case_url.replace('http:/', '')
+
+    # Убедиться что начинается с /
+    if not case_url.startswith('/'):
+        case_url = '/' + case_url
+
+    # Создать правильный полный URL
+    case_url = f"https://kad.arbitr.ru{case_url}"
 
     print(f"📋 Дело: {case['case_number']}")
     print(f"🔗 URL: {case_url}")
