@@ -105,17 +105,9 @@ async def parse_all_january_2024():
         for page_num in range(1, total_pages + 1):
             print(f"📖 Парсинг страницы {page_num}/{total_pages}...")
 
-            # Получить HTML таблицы
-            table = await scraper.page.query_selector("table.b-cases")
-            if not table:
-                print(f"   ⚠️  Таблица не найдена на странице {page_num}")
-                continue
-
-            table_html = await table.inner_html()
-
-            # Парсинг
+            # Парсинг используя рабочий метод из scraper
             try:
-                cases = scraper._parse_table_html(table_html)
+                cases = await scraper._parse_current_page()
                 all_cases.extend(cases)
                 print(f"   ✓ Найдено дел: {len(cases)} (всего: {len(all_cases)})")
 
@@ -186,7 +178,23 @@ async def parse_all_january_2024():
 
             try:
                 # Открыть страницу дела
-                case_url = f"https://kad.arbitr.ru{case['url']}"
+                # Очистить и нормализовать URL
+                case_url = case['url']
+
+                # Удалить любые префиксы домена (даже некорректные)
+                case_url = case_url.replace('https//kad.arbitr.ru', '')
+                case_url = case_url.replace('http//kad.arbitr.ru', '')
+                case_url = case_url.replace('//kad.arbitr.ru', '')
+                case_url = case_url.replace('https://kad.arbitr.ru', '')
+                case_url = case_url.replace('http://kad.arbitr.ru', '')
+
+                # Убедиться что начинается с /
+                if not case_url.startswith('/'):
+                    case_url = '/' + case_url
+
+                # Создать правильный полный URL
+                case_url = f"https://kad.arbitr.ru{case_url}"
+
                 await scraper.page.goto(case_url, wait_until="networkidle", timeout=30000)
                 await asyncio.sleep(2)
 
