@@ -131,7 +131,8 @@ async def test_full_workflow():
 
             try:
                 # Open case page in same tab
-                await scraper.page.goto(case["url"], wait_until="networkidle")
+                case_url = f"https://kad.arbitr.ru{case['url']}"
+                await scraper.page.goto(case_url, wait_until="networkidle")
                 await asyncio.sleep(2)
 
                 print(f"   ✓ Страница дела открыта")

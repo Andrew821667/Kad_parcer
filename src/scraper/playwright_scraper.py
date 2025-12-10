@@ -414,6 +414,21 @@ class PlaywrightScraper:
                 case_number = case_link.text.strip()
                 case_url = case_link.get("href", "")
 
+                # Normalize URL: ensure it starts with /Card/ or /Document/
+                if case_url:
+                    # Remove any domain prefixes (even malformed ones)
+                    case_url = case_url.replace('https//kad.arbitr.ru', '')
+                    case_url = case_url.replace('http//kad.arbitr.ru', '')
+                    case_url = case_url.replace('//kad.arbitr.ru', '')
+                    case_url = case_url.replace('https://kad.arbitr.ru', '')
+                    case_url = case_url.replace('http://kad.arbitr.ru', '')
+                    case_url = case_url.replace('https:/', '')
+                    case_url = case_url.replace('http:/', '')
+
+                    # Ensure starts with /
+                    if not case_url.startswith('/'):
+                        case_url = '/' + case_url
+
                 # Column 2: Judge and Court
                 court_td = row.find("td", class_="court")
                 judge = ""
