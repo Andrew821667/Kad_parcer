@@ -146,58 +146,52 @@ async def test_full_workflow():
 
                 print(f"   Найдено PDF ссылок: {len(doc_links)}")
 
-                # Get first PDF link
-                first_link = doc_links[0]
-                link_text = await first_link.inner_text()
-                pdf_url = await first_link.get_attribute("href")
+                # Get cookies once for all downloads
+                cookies = await scraper.page.context.cookies()
+                cookie_dict = {cookie['name']: cookie['value'] for cookie in cookies}
 
-                print(f"   Документ: {link_text[:50]}")
-                print(f"   URL: {pdf_url}")
+                # Download ALL PDFs from this case
+                import httpx
 
-                # Extract filename from URL
-                pdf_filename = pdf_url.split("/")[-1] if pdf_url else "document.pdf"
+                for doc_idx, link in enumerate(doc_links, 1):
+                    try:
+                        link_text = await link.inner_text()
+                        pdf_url = await link.get_attribute("href")
 
-                # Download PDF via HTTP with browser cookies (most reliable method)
-                try:
-                    # Get cookies from browser to maintain session
-                    cookies = await scraper.page.context.cookies()
+                        print(f"   [{doc_idx}/{len(doc_links)}] {link_text[:50]}")
 
-                    # Convert to dict for httpx
-                    cookie_dict = {cookie['name']: cookie['value'] for cookie in cookies}
+                        # Extract filename from URL
+                        pdf_filename = pdf_url.split("/")[-1] if pdf_url else f"document_{doc_idx}.pdf"
 
-                    # Download PDF via HTTP
-                    import httpx
+                        # Download PDF via HTTP with browser cookies
+                        async with httpx.AsyncClient(
+                            cookies=cookie_dict,
+                            timeout=30.0,
+                            follow_redirects=True
+                        ) as client:
+                            response = await client.get(pdf_url)
 
-                    async with httpx.AsyncClient(
-                        cookies=cookie_dict,
-                        timeout=30.0,
-                        follow_redirects=True
-                    ) as client:
-                        response = await client.get(pdf_url)
+                            if response.status_code == 200:
+                                # Verify it's actually a PDF
+                                content_type = response.headers.get('content-type', '')
 
-                        if response.status_code == 200:
-                            # Verify it's actually a PDF
-                            content_type = response.headers.get('content-type', '')
+                                if 'pdf' in content_type.lower() or pdf_url.endswith('.pdf'):
+                                    # Save PDF with index to avoid overwriting
+                                    filename = f"{case['case_number'].replace('/', '_')}_{doc_idx}_{pdf_filename}"
+                                    filepath = downloads_dir / filename
 
-                            if 'pdf' in content_type.lower() or pdf_url.endswith('.pdf'):
-                                # Save PDF
-                                filename = f"{case['case_number'].replace('/', '_')}_{pdf_filename}"
-                                filepath = downloads_dir / filename
+                                    filepath.write_bytes(response.content)
 
-                                filepath.write_bytes(response.content)
-
-                                print(
-                                    f"   ✅ Скачан: {filename} ({len(response.content)} bytes)"
-                                )
-                                downloaded_count += 1
+                                    print(f"       ✅ {len(response.content)//1024} KB")
+                                    downloaded_count += 1
+                                else:
+                                    print(f"       ⚠️  Не PDF (Content-Type: {content_type})")
                             else:
-                                print(f"   ⚠️  Не PDF файл (Content-Type: {content_type})")
-                        else:
-                            print(f"   ❌ HTTP ошибка: {response.status_code}")
+                                print(f"       ❌ HTTP {response.status_code}")
 
-                except Exception as download_error:
-                    print(f"   ❌ Ошибка скачивания: {download_error}")
-                    continue
+                    except Exception as download_error:
+                        print(f"       ❌ Ошибка: {download_error}")
+                        continue
 
             except Exception as e:
                 print(f"   ❌ Ошибка: {e}")
@@ -208,7 +202,8 @@ async def test_full_workflow():
         print("ИТОГИ")
         print("=" * 80)
         print(f"✅ Дел спарсено: {len(results)}")
-        print(f"✅ Актов скачано: {downloaded_count}/5")
+        print(f"✅ Дел обработано: 5")
+        print(f"✅ Актов скачано: {downloaded_count}")
         print(f"📁 Папка: {downloads_dir}")
         print("=" * 80)
 
