@@ -83,6 +83,15 @@ async def main():
 
         # Submit
         print("\n3. Нажимаю 'Найти'...")
+
+        # Check form values before submit
+        print("\n   Проверяю значения полей перед отправкой:")
+        date_vals = await page.evaluate("""() => {
+            const inputs = document.querySelectorAll('input[placeholder="дд.мм.гггг"]');
+            return Array.from(inputs).map(inp => inp.value);
+        }""")
+        print(f"   Значения дат: {date_vals}")
+
         await page.click("#b-form-submit")
 
         # Wait for results
@@ -94,10 +103,26 @@ async def main():
         url = page.url
         print(f"   URL: {url}")
 
+        # Take screenshot
+        screenshot_path = "/tmp/kad_chrome_results.png"
+        await page.screenshot(path=screenshot_path, full_page=True)
+        print(f"   📸 Скриншот сохранён: {screenshot_path}")
+
+        # Save HTML
+        html = await page.content()
+        html_path = "/tmp/kad_chrome_results.html"
+        with open(html_path, "w", encoding="utf-8") as f:
+            f.write(html)
+        print(f"   💾 HTML сохранён: {html_path}")
+
+        # Check for ANY tables on page
+        all_tables = await page.query_selector_all("table")
+        print(f"\n   Найдено таблиц на странице: {len(all_tables)}")
+
         table = await page.query_selector("table#b-cases")
         if table:
             rows = await table.query_selector_all("tr")
-            print(f"   ✅ Таблица найдена!")
+            print(f"   ✅ Таблица #b-cases найдена!")
             print(f"   Количество строк: {len(rows)}")
 
             if len(rows) > 1:
@@ -109,13 +134,28 @@ async def main():
                     cells = await first_row.query_selector_all("td")
                     if cells:
                         print("\n   Первое дело:")
-                        for i, cell in enumerate(cells[:3], 1):
+                        for i, cell in enumerate(cells[:5], 1):
                             text = await cell.inner_text()
-                            print(f"     Колонка {i}: {text[:50]}")
+                            print(f"     Колонка {i}: {text[:80]}")
             else:
                 print("   ⚠️  Таблица пустая (0 строк)")
         else:
-            print("   ❌ Таблица НЕ найдена")
+            print("   ❌ Таблица #b-cases НЕ найдена")
+
+            # Try to find any table with data
+            if len(all_tables) > 0:
+                print(f"\n   Проверяю первую таблицу на странице...")
+                first_table = all_tables[0]
+                rows = await first_table.query_selector_all("tr")
+                print(f"   Строк в первой таблице: {len(rows)}")
+
+                if len(rows) > 0:
+                    print("\n   Первая строка первой таблицы:")
+                    first_row = rows[0]
+                    cells = await first_row.query_selector_all("td, th")
+                    for i, cell in enumerate(cells[:5], 1):
+                        text = await cell.inner_text()
+                        print(f"     Ячейка {i}: {text[:80]}")
 
         print("\n" + "=" * 80)
         print("Браузер останется открытым - проверьте результаты вручную!")
