@@ -178,7 +178,10 @@ async def parse_all_january_2024():
 
             try:
                 # Открыть страницу дела
-                case_url = f"https://kad.arbitr.ru{case['url']}"
+                # Проверить, не является ли URL уже абсолютным
+                case_url = case['url']
+                if not case_url.startswith('http'):
+                    case_url = f"https://kad.arbitr.ru{case_url}"
                 await scraper.page.goto(case_url, wait_until="networkidle", timeout=30000)
                 await asyncio.sleep(2)
 
