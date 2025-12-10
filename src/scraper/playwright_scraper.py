@@ -393,59 +393,82 @@ class PlaywrightScraper:
         results = []
         for row in rows:
             try:
-                # Extract case type
-                case_type_div = row.find("td", class_="num")
-                if not case_type_div:
+                # Column 1: Case number, date, URL
+                num_td = row.find("td", class_="num")
+                if not num_td:
                     continue
 
-                delotype_div = case_type_div.find("div", class_="b-container").find("div")
-                case_type = delotype_div.get("class")[0] if delotype_div else "unknown"
+                # Extract case type (civil, administrative, etc.)
+                type_div = num_td.find("div", class_=True)
+                case_type = type_div.get("class", ["unknown"])[0] if type_div else "unknown"
 
-                # Extract case number and URL
-                case_num_link = case_type_div.find("a", class_="num_case")
-                if not case_num_link:
+                # Extract date from span inside civil/administrative div
+                date_span = num_td.find("span")
+                case_date = date_span.text.strip() if date_span else ""
+
+                # Extract case number from link
+                case_link = num_td.find("a", class_="num_case")
+                if not case_link:
                     continue
 
-                case_number = ";".join(case_type_div.text.replace("\n", "").split())
-                case_url = case_num_link.get("href", "")
+                case_number = case_link.text.strip()
+                case_url = case_link.get("href", "")
 
-                # Extract court
+                # Column 2: Judge and Court
                 court_td = row.find("td", class_="court")
-                court = ";".join(court_td.text.replace("\n", "").split()) if court_td else ""
+                judge = ""
+                court = ""
 
-                # Extract plaintiff
+                if court_td:
+                    # Extract judge
+                    judge_div = court_td.find("div", class_="judge")
+                    if judge_div:
+                        judge = judge_div.text.strip()
+
+                    # Extract court (second div without class='judge')
+                    all_divs = court_td.find_all("div", recursive=False)
+                    if len(all_divs) > 0:
+                        # Get the b-container div
+                        container = all_divs[0]
+                        inner_divs = container.find_all("div", recursive=False)
+                        # Court is the div that doesn't have class='judge'
+                        for div in inner_divs:
+                            if "judge" not in div.get("class", []):
+                                court = div.text.strip()
+                                break
+
+                # Column 3: Plaintiff
                 plaintiff_td = row.find("td", class_="plaintiff")
                 plaintiff = ""
                 if plaintiff_td:
-                    try:
-                        plaintiff_span = plaintiff_td.find("span", class_="js-rolloverHtml")
-                        if plaintiff_span:
-                            plaintiff_parts = [
-                                p.strip() for p in plaintiff_span.text.split("\n")
-                            ]
-                            plaintiff = ";".join(filter(None, plaintiff_parts))
-                    except Exception:
-                        pass
+                    # Try to get the main visible text (not from rolloverHtml)
+                    rollover_span = plaintiff_td.find("span", class_="js-rollover")
+                    if rollover_span:
+                        # Get text but exclude the hidden js-rolloverHtml span
+                        for hidden in rollover_span.find_all("span", class_="js-rolloverHtml"):
+                            hidden.extract()  # Remove hidden span from tree
+                        plaintiff = rollover_span.text.strip()
 
-                # Extract respondent(s)
+                # Column 4: Respondent(s)
                 respondent_td = row.find("td", class_="respondent")
                 respondents = []
                 if respondent_td:
-                    try:
-                        respondent_spans = respondent_td.find_all("span", class_="js-rolloverHtml")
-                        for span in respondent_spans:
-                            resp_parts = [p.strip() for p in span.text.split("\n")]
-                            resp_text = ";".join(filter(None, resp_parts))
-                            if resp_text:
-                                respondents.append(resp_text)
-                    except Exception:
-                        pass
+                    rollover_spans = respondent_td.find_all("span", class_="js-rollover")
+                    for rollover_span in rollover_spans:
+                        # Get text but exclude the hidden js-rolloverHtml span
+                        for hidden in rollover_span.find_all("span", class_="js-rolloverHtml"):
+                            hidden.extract()
+                        resp_text = rollover_span.text.strip()
+                        if resp_text:
+                            respondents.append(resp_text)
 
                 # Build result dictionary
                 case_data = {
                     "case_type": case_type,
                     "case_number": case_number,
+                    "case_date": case_date,
                     "url": case_url,
+                    "judge": judge,
                     "court": court,
                     "plaintiff": plaintiff,
                     "respondents": respondents,

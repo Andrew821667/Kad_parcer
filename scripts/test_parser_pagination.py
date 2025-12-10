@@ -110,8 +110,11 @@ async def test_parser_with_pagination():
                 print("\n📋 Первые 3 дела:")
                 for i, case in enumerate(results[:3], 1):
                     print(f"\n{i}. {case.get('case_number', 'N/A')}")
+                    print(f"   Дата: {case.get('case_date', 'N/A')}")
+                    print(f"   Судья: {case.get('judge', 'N/A')}")
                     print(f"   Суд: {case.get('court', 'N/A')}")
-                    print(f"   Дата: {case.get('date', 'N/A')}")
+                    print(f"   Истец: {case.get('plaintiff', 'N/A')}")
+                    print(f"   Ответчики: {case.get('respondents', [])}")
 
         except Exception as e:
             logger.error("test_failed", error=str(e))
