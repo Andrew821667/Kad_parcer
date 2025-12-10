@@ -170,26 +170,27 @@ class PlaywrightScraper:
             except ValueError as e:
                 logger.warning("unknown_court_code", error=str(e))
 
-        # Fill form fields
-        # Note: kad.arbitr.ru form has specific field structure
+        # Fill form fields using actual placeholders from kad.arbitr.ru
         if participant:
-            await self.page.fill("textarea:visible", participant)
+            await self.page.fill('textarea[placeholder="название, ИНН или ОГРН"]', participant)
 
         if judge:
-            await self.page.fill('input[placeholder*="судь"]', judge)
+            await self.page.fill('input[placeholder="фамилия судьи"]', judge)
 
         if court_full_name:
-            # Use autocomplete for court selection
-            await self.page.fill('input[placeholder*="Суд"]', court_full_name)
+            # Court field with autocomplete
+            await self.page.fill('input[placeholder="название суда"]', court_full_name)
             await asyncio.sleep(0.5)  # Wait for autocomplete dropdown
             await self.page.keyboard.press("Enter")  # Select first match
 
         if case_number:
-            await self.page.fill('input[placeholder*="дела"]', case_number)
+            await self.page.fill('input[placeholder="например, А50-5568/08"]', case_number)
 
-        # Date fields
-        await self.page.fill('input[placeholder*="Дата подачи с"]', date_from_str)
-        await self.page.fill('input[placeholder*="Дата подачи по"]', date_to_str)
+        # Date fields - both have same placeholder, use nth selector
+        date_inputs = await self.page.query_selector_all('input[placeholder="дд.мм.гггг"]')
+        if len(date_inputs) >= 2:
+            await date_inputs[0].fill(date_from_str)  # First date field (from)
+            await date_inputs[1].fill(date_to_str)    # Second date field (to)
         await self.page.keyboard.press("Tab")  # Trigger date validation
 
         await asyncio.sleep(1.2)
