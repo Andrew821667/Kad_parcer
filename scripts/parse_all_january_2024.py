@@ -56,31 +56,43 @@ async def parse_all_january_2024():
 
         # Открыть КАД Арбитр
         await scraper.page.goto("https://kad.arbitr.ru", wait_until="networkidle")
-        await asyncio.sleep(3)
+        await asyncio.sleep(2)
+
+        # Закрыть popup если есть
+        try:
+            await scraper.page.keyboard.press("Escape")
+            await asyncio.sleep(1)
+        except Exception:
+            pass
 
         # Заполнить форму поиска (январь 2024)
-        date_from_input = await scraper.page.query_selector('input[name="DateFrom"]')
-        await date_from_input.fill("01.01.2024")
-        await asyncio.sleep(1)
+        date_inputs = await scraper.page.query_selector_all('input[placeholder="дд.мм.гггг"]')
+        if len(date_inputs) >= 2:
+            await date_inputs[0].click()
+            await asyncio.sleep(0.2)
+            await date_inputs[0].fill("01.01.2024")
+            await asyncio.sleep(0.5)
 
-        date_to_input = await scraper.page.query_selector('input[name="DateTo"]')
-        await date_to_input.fill("31.01.2024")
-        await asyncio.sleep(1)
+            await date_inputs[1].click()
+            await asyncio.sleep(0.2)
+            await date_inputs[1].fill("31.01.2024")
+            await asyncio.sleep(0.5)
+
+        await scraper.page.click("body")
+        await asyncio.sleep(0.5)
 
         # Отправить форму
-        search_button = await scraper.page.query_selector('button[type="submit"]')
-        await search_button.click()
+        await scraper.page.click("#b-form-submit")
         await asyncio.sleep(5)
 
         # Определить количество страниц
-        pagination = await scraper.page.query_selector(".pagination")
-        page_links = await pagination.query_selector_all("a")
+        total_pages_input = await scraper.page.query_selector("input#documentsPagesCount")
+        if not total_pages_input:
+            print("❌ Таблица результатов не найдена")
+            return
 
-        total_pages = 0
-        for link in page_links:
-            text = await link.inner_text()
-            if text.strip().isdigit():
-                total_pages = max(total_pages, int(text.strip()))
+        total_pages_str = await total_pages_input.get_attribute("value")
+        total_pages = int(total_pages_str) if total_pages_str else 0
 
         print(f"📄 Найдено страниц: {total_pages}")
         print(f"📄 Будем парсить: ВСЕ {total_pages} страницы")
