@@ -29,7 +29,7 @@ async def analyze_expandable_sections():
     with open(cases_file, encoding="utf-8") as f:
         all_cases = json.load(f)
 
-    # Взять первое дело с несколькими актами
+    # Взять первое дело
     case = all_cases[0]
 
     # Нормализовать URL
