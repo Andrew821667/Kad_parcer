@@ -136,79 +136,104 @@ async def test_full_workflow():
 
                 print(f"   ✓ Страница дела открыта")
 
-                # Look for document download links
-                # Try multiple selectors
-                doc_links = await scraper.page.query_selector_all(
-                    'a[href*="PdfDocument"], a[href*=".pdf"]'
-                )
+                # Look for DIRECT PDF links (ending with .pdf)
+                doc_links = await scraper.page.query_selector_all('a[href$=".pdf"]')
 
                 if not doc_links:
-                    print(f"   ⚠️  Не найдены ссылки на PDF документы")
+                    print(f"   ⚠️  Не найдены прямые ссылки на PDF")
                     continue
 
-                print(f"   Найдено ссылок на документы: {len(doc_links)}")
+                print(f"   Найдено PDF ссылок: {len(doc_links)}")
 
-                # Get first link
+                # Get first PDF link
                 first_link = doc_links[0]
                 link_text = await first_link.inner_text()
                 pdf_url = await first_link.get_attribute("href")
 
-                # Make URL absolute if needed
-                if pdf_url and not pdf_url.startswith("http"):
-                    pdf_url = f"https://kad.arbitr.ru{pdf_url}"
-
                 print(f"   Документ: {link_text[:50]}")
-                print(f"   URL: {pdf_url[:80]}...")
+                print(f"   URL: {pdf_url}")
 
-                # Method 1: Try to download via context (preserves cookies/auth)
+                # Extract filename from URL
+                pdf_filename = pdf_url.split("/")[-1] if pdf_url else "document.pdf"
+
+                # Method: Open link in new tab and download
                 try:
-                    # Navigate to PDF URL - this might open PDF in browser
-                    response = await scraper.page.goto(pdf_url, wait_until="load", timeout=30000)
+                    # Create new page for download
+                    new_page = await scraper.page.context.new_page()
 
-                    if response and response.ok:
-                        # Get content
-                        pdf_content = await response.body()
+                    # Set up download handler
+                    async with new_page.expect_download(timeout=30000) as download_info:
+                        # Navigate to PDF URL
+                        await new_page.goto(pdf_url, wait_until="load")
 
-                        # Save file
-                        filename = f"{case['case_number'].replace('/', '_')}.pdf"
-                        filepath = downloads_dir / filename
+                    download = await download_info.value
 
-                        filepath.write_bytes(pdf_content)
-                        file_size = len(pdf_content)
+                    # Save file
+                    filename = f"{case['case_number'].replace('/', '_')}_{pdf_filename}"
+                    filepath = downloads_dir / filename
 
-                        print(f"   ✅ Скачан: {filename} ({file_size} bytes)")
-                        downloaded_count += 1
+                    await download.save_as(str(filepath))
 
-                        # Go back to case page for next iteration
-                        await scraper.page.go_back(wait_until="networkidle")
-                        await asyncio.sleep(1)
+                    file_size = filepath.stat().st_size if filepath.exists() else 0
 
-                    else:
-                        print(f"   ❌ Не удалось загрузить PDF (status: {response.status if response else 'none'})")
+                    print(f"   ✅ Скачан: {filename} ({file_size} bytes)")
+                    downloaded_count += 1
+
+                    # Close new page
+                    await new_page.close()
 
                 except Exception as download_error:
-                    print(f"   ❌ Ошибка скачивания: {download_error}")
+                    print(f"   ❌ Ошибка: {download_error}")
 
-                    # Try method 2: Use print button
+                    # Try alternative: download via goto and content
                     try:
-                        print(f"   Пробую альтернативный метод (печать)...")
+                        print(f"   Пробую альтернативный метод...")
 
-                        # Go back to case page if we're on PDF
-                        await scraper.page.goto(case["url"], wait_until="networkidle")
+                        # Create new page
+                        new_page = await scraper.page.context.new_page()
+
+                        # Navigate to PDF
+                        await new_page.goto(pdf_url, wait_until="load", timeout=30000)
                         await asyncio.sleep(2)
 
-                        # Generate PDF from page using print
-                        filename = f"{case['case_number'].replace('/', '_')}_print.pdf"
+                        # Try to get PDF content
+                        pdf_content = await new_page.content()
+
+                        # Save as HTML (contains PDF viewer)
+                        filename = f"{case['case_number'].replace('/', '_')}_{pdf_filename}"
                         filepath = downloads_dir / filename
 
-                        await scraper.page.pdf(path=str(filepath))
+                        # If page loaded PDF, try to get it as bytes
+                        try:
+                            # Check if it's a PDF page (Chrome PDF viewer)
+                            is_pdf_viewer = "pdf" in new_page.url.lower()
 
-                        file_size = filepath.stat().st_size if filepath.exists() else 0
-                        print(f"   ✅ Скачан (печать): {filename} ({file_size} bytes)")
-                        downloaded_count += 1
+                            if is_pdf_viewer:
+                                # Use CDP to get PDF
+                                client = await new_page.context.new_cdp_session(new_page)
+                                result = await client.send(
+                                    "Page.printToPDF", {"printBackground": True}
+                                )
+                                import base64
 
-                    except Exception as print_error:
-                        print(f"   ❌ Ошибка печати: {print_error}")
+                                pdf_bytes = base64.b64decode(result["data"])
+                                filepath.write_bytes(pdf_bytes)
+
+                                print(
+                                    f"   ✅ Скачан (альт): {filename} ({len(pdf_bytes)} bytes)"
+                                )
+                                downloaded_count += 1
+                            else:
+                                print(f"   ❌ Не удалось открыть PDF")
+
+                        except Exception as e:
+                            print(f"   ❌ Ошибка альт. метода: {e}")
+
+                        # Close new page
+                        await new_page.close()
+
+                    except Exception as alt_error:
+                        print(f"   ❌ Альт. метод не сработал: {alt_error}")
                         continue
 
             except Exception as e:
