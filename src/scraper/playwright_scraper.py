@@ -34,8 +34,10 @@ class PlaywrightScraper:
     def __init__(
         self,
         headless: bool = True,
-        browser_type: str = "firefox",
+        browser_type: str = "chromium",
         base_delay: tuple[float, float] = (3.0, 5.0),
+        use_cdp: bool = False,
+        cdp_url: str = "http://localhost:9222",
     ) -> None:
         """
         Initialize Playwright scraper.
@@ -44,13 +46,18 @@ class PlaywrightScraper:
             headless: Run browser in headless mode
             browser_type: Browser to use ('firefox', 'chromium', 'webkit')
             base_delay: Min/max random delay in seconds between requests
+            use_cdp: Connect to existing Chrome via CDP (bypasses all detection)
+            cdp_url: CDP endpoint URL (default: http://localhost:9222)
         """
         self.headless = headless
         self.browser_type = browser_type
         self.base_delay = base_delay
+        self.use_cdp = use_cdp
+        self.cdp_url = cdp_url
         self.playwright = None
         self.browser: Browser | None = None
         self.page: Page | None = None
+        self.context = None
 
     async def __aenter__(self) -> PlaywrightScraper:
         """Context manager entry."""
@@ -62,85 +69,112 @@ class PlaywrightScraper:
         await self.close()
 
     async def start(self) -> None:
-        """Start browser instance with anti-detection measures."""
-        logger.info(
-            "starting_playwright_browser",
-            browser_type=self.browser_type,
-            headless=self.headless,
-        )
-
+        """Start browser instance with anti-detection measures or connect via CDP."""
         self.playwright = await async_playwright().start()
 
-        # Select browser
-        if self.browser_type == "firefox":
-            browser_launcher = self.playwright.firefox
-        elif self.browser_type == "chromium":
-            browser_launcher = self.playwright.chromium
-        elif self.browser_type == "webkit":
-            browser_launcher = self.playwright.webkit
+        if self.use_cdp:
+            # Connect to existing Chrome via CDP (100% undetectable)
+            logger.info(
+                "connecting_to_chrome_via_cdp",
+                cdp_url=self.cdp_url,
+            )
+
+            self.browser = await self.playwright.chromium.connect_over_cdp(
+                self.cdp_url
+            )
+
+            # Get existing context or create new one
+            contexts = self.browser.contexts
+            if contexts:
+                self.context = contexts[0]
+                pages = self.context.pages
+                if pages:
+                    self.page = pages[0]
+                else:
+                    self.page = await self.context.new_page()
+            else:
+                self.page = await self.browser.new_page()
+
+            logger.info("connected_to_real_chrome_via_cdp")
+
         else:
-            msg = f"Unknown browser type: {self.browser_type}"
-            raise ValueError(msg)
+            # Launch new browser with anti-detection
+            logger.info(
+                "starting_playwright_browser",
+                browser_type=self.browser_type,
+                headless=self.headless,
+            )
 
-        # Launch browser with args to avoid detection
-        launch_args = []
-        if self.browser_type == "chromium":
-            launch_args = [
-                "--disable-blink-features=AutomationControlled",
-                "--disable-dev-shm-usage",
-                "--no-sandbox",
-            ]
+            # Select browser
+            if self.browser_type == "firefox":
+                browser_launcher = self.playwright.firefox
+            elif self.browser_type == "chromium":
+                browser_launcher = self.playwright.chromium
+            elif self.browser_type == "webkit":
+                browser_launcher = self.playwright.webkit
+            else:
+                msg = f"Unknown browser type: {self.browser_type}"
+                raise ValueError(msg)
 
-        self.browser = await browser_launcher.launch(
-            headless=self.headless,
-            args=launch_args if launch_args else None,
-        )
+            # Launch browser with args to avoid detection
+            launch_args = []
+            if self.browser_type == "chromium":
+                launch_args = [
+                    "--disable-blink-features=AutomationControlled",
+                    "--disable-dev-shm-usage",
+                    "--no-sandbox",
+                ]
 
-        # Create context with realistic settings
-        context = await self.browser.new_context(
-            viewport={"width": 1920, "height": 1080},
-            user_agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-            locale="ru-RU",
-            timezone_id="Europe/Moscow",
-        )
+            self.browser = await browser_launcher.launch(
+                headless=self.headless,
+                args=launch_args if launch_args else None,
+            )
 
-        # Create page from context
-        self.page = await context.new_page()
+            # Create context with realistic settings
+            self.context = await self.browser.new_context(
+                viewport={"width": 1920, "height": 1080},
+                user_agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+                locale="ru-RU",
+                timezone_id="Europe/Moscow",
+            )
 
-        # Hide automation markers
-        await self.page.add_init_script("""
-            // Hide webdriver property
-            Object.defineProperty(navigator, 'webdriver', {
-                get: () => undefined
-            });
+            # Create page from context
+            self.page = await self.context.new_page()
 
-            // Mock plugins
-            Object.defineProperty(navigator, 'plugins', {
-                get: () => [1, 2, 3, 4, 5]
-            });
+            # Hide automation markers
+            await self.page.add_init_script("""
+                // Hide webdriver property
+                Object.defineProperty(navigator, 'webdriver', {
+                    get: () => undefined
+                });
 
-            // Mock languages
-            Object.defineProperty(navigator, 'languages', {
-                get: () => ['ru-RU', 'ru', 'en-US', 'en']
-            });
+                // Mock plugins
+                Object.defineProperty(navigator, 'plugins', {
+                    get: () => [1, 2, 3, 4, 5]
+                });
 
-            // Override permissions
-            const originalQuery = window.navigator.permissions.query;
-            window.navigator.permissions.query = (parameters) => (
-                parameters.name === 'notifications' ?
-                    Promise.resolve({ state: Notification.permission }) :
-                    originalQuery(parameters)
-            );
+                // Mock languages
+                Object.defineProperty(navigator, 'languages', {
+                    get: () => ['ru-RU', 'ru', 'en-US', 'en']
+                });
 
-            // Mock chrome object for non-Chrome browsers
-            if (!window.chrome) {
-                window.chrome = {
-                    runtime: {}
-                };
-            }
-        """)
+                // Override permissions
+                const originalQuery = window.navigator.permissions.query;
+                window.navigator.permissions.query = (parameters) => (
+                    parameters.name === 'notifications' ?
+                        Promise.resolve({ state: Notification.permission }) :
+                        originalQuery(parameters)
+                );
 
-        logger.info("playwright_browser_started_with_stealth")
+                // Mock chrome object for non-Chrome browsers
+                if (!window.chrome) {
+                    window.chrome = {
+                        runtime: {}
+                    };
+                }
+            """)
+
+            logger.info("playwright_browser_started_with_stealth")
 
     async def close(self) -> None:
         """Close browser and cleanup."""
