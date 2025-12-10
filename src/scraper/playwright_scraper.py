@@ -186,22 +186,22 @@ class PlaywrightScraper:
         if case_number:
             await self.page.fill('input[placeholder="например, А50-5568/08"]', case_number)
 
-        # Date fields - fill each separately and close datepicker between them
+        # Date fields - click before fill to avoid calendar issues
         date_inputs = await self.page.query_selector_all('input[placeholder="дд.мм.гггг"]')
         if len(date_inputs) >= 2:
-            # Fill first date field
+            # Fill first date: click -> fill -> wait
+            await date_inputs[0].click()  # Focus on first field
+            await asyncio.sleep(0.2)
             await date_inputs[0].fill(date_from_str)
-            await asyncio.sleep(0.3)
-            await self.page.keyboard.press("Escape")  # Close datepicker
-            await asyncio.sleep(0.3)
+            await asyncio.sleep(0.5)
 
-            # Fill second date field
+            # Fill second date: click on second field (closes first calendar) -> fill -> wait
+            await date_inputs[1].click()  # Focus on second field (closes first calendar)
+            await asyncio.sleep(0.2)
             await date_inputs[1].fill(date_to_str)
-            await asyncio.sleep(0.3)
-            await self.page.keyboard.press("Escape")  # Close datepicker
-            await asyncio.sleep(0.3)
+            await asyncio.sleep(0.5)
 
-        # Click somewhere safe to ensure all popups are closed
+        # Close second calendar by clicking elsewhere
         await self.page.click("body")
         await asyncio.sleep(0.5)
 

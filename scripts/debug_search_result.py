@@ -36,23 +36,23 @@ async def main():
 
         date_inputs = await page.query_selector_all('input[placeholder="дд.мм.гггг"]')
         if len(date_inputs) >= 2:
-            # Fill first date
+            # Fill first date: click -> fill -> wait
+            await date_inputs[0].click()  # Focus on first field
+            await asyncio.sleep(0.2)
             await date_inputs[0].fill("01.01.2024")
-            await asyncio.sleep(0.3)
-            await page.keyboard.press("Escape")  # Close datepicker
-            await asyncio.sleep(0.3)
+            await asyncio.sleep(0.5)
             print("   ✓ Первая дата заполнена")
 
-            # Fill second date
+            # Fill second date: click on second field (closes first calendar) -> fill -> wait
+            await date_inputs[1].click()  # Focus on second field (closes first calendar)
+            await asyncio.sleep(0.2)
             await date_inputs[1].fill("31.01.2024")
-            await asyncio.sleep(0.3)
-            await page.keyboard.press("Escape")  # Close datepicker
-            await asyncio.sleep(0.3)
+            await asyncio.sleep(0.5)
             print("   ✓ Вторая дата заполнена")
 
-        # Close any remaining popups
-        print("\n2. Закрываю все popup'ы...")
-        await page.click("body")  # Click somewhere safe
+        # Close second calendar by clicking elsewhere
+        print("\n2. Закрываю календарь кликом по body...")
+        await page.click("body")  # Click somewhere safe to close second calendar
         await asyncio.sleep(0.5)
 
         # Click submit
