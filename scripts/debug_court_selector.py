@@ -114,22 +114,63 @@ async def debug_court_selector():
             return
 
         # ====================================================================
-        # 3. КЛИКНУТЬ НА ПОЛЕ И ПОСМОТРЕТЬ ЧТО ПОЯВЛЯЕТСЯ
+        # 3. НАЙТИ ИКОНКУ РАСКРЫТИЯ СПИСКА
         # ====================================================================
 
         print("=" * 80)
-        print("3. КЛИК НА ПОЛЕ 'СУД'")
+        print("3. ПОИСК ИКОНКИ ВЫПАДАЮЩЕГО СПИСКА")
         print("=" * 80)
         print()
 
-        await court_input.click()
-        print("✓ Кликнули на поле")
-        await asyncio.sleep(2)
+        # Найти родительский контейнер поля
+        parent = await court_input.evaluate_handle("el => el.parentElement")
+        parent_element = parent.as_element()
 
-        # Ввести несколько букв чтобы вызвать автокомплит
-        await court_input.fill("АС")
-        print("✓ Ввели 'АС'")
-        await asyncio.sleep(2)
+        if parent_element:
+            parent_html = await parent_element.inner_html()
+            print("Родительский элемент:")
+            print(parent_html[:300])
+            print()
+
+            # Искать кнопку/иконку раскрытия рядом с полем
+            dropdown_selectors = [
+                'button',
+                'i',
+                'span.dropdown',
+                '.dropdown-toggle',
+                '.arrow',
+                '.icon',
+                '[class*="arrow"]',
+                '[class*="drop"]',
+                'a',
+            ]
+
+            dropdown_icon = None
+            for selector in dropdown_selectors:
+                try:
+                    icon = await parent_element.query_selector(selector)
+                    if icon:
+                        icon_class = await icon.get_attribute("class") or ""
+                        icon_tag = await icon.evaluate("el => el.tagName")
+                        print(f"✓ Найдена иконка: <{icon_tag}> class='{icon_class}'")
+
+                        if not dropdown_icon:
+                            dropdown_icon = icon
+                except:
+                    pass
+
+            print()
+
+            # Кликнуть на иконку
+            if dropdown_icon:
+                print("✓ Кликаем на иконку раскрытия списка...")
+                await dropdown_icon.click()
+                await asyncio.sleep(3)
+                print("✓ Кликнули")
+            else:
+                print("⚠️  Иконка не найдена, кликаем на само поле...")
+                await court_input.click()
+                await asyncio.sleep(2)
 
         # ====================================================================
         # 4. НАЙТИ ВЫПАДАЮЩИЙ СПИСОК
