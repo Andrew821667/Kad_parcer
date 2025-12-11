@@ -92,19 +92,20 @@ async def parse_day_court(scraper, day: datetime, court_name: str):
         await date_inputs[1].fill(day_str)
         await asyncio.sleep(0.3)
 
-    # Выбрать суд
-    court_input = await scraper.page.query_selector('input[placeholder="название суда"]')
-    if court_input:
-        await court_input.click()
-        await asyncio.sleep(0.3)
-        await court_input.fill(court_name)
+    # Выбрать суд из <select>
+    select_element = await scraper.page.query_selector('select#Courts')
+    if select_element:
+        # Найти опцию с нужным названием суда и выбрать ее
+        await select_element.evaluate(f"""(select, courtName) => {{
+            const options = Array.from(select.options);
+            const option = options.find(opt => opt.text.trim() === courtName);
+            if (option) {{
+                select.value = option.value;
+                // Триггернуть событие change
+                select.dispatchEvent(new Event('change', {{ bubbles: true }}));
+            }}
+        }}""", court_name)
         await asyncio.sleep(0.5)
-
-        # Выбрать первый результат автокомплита
-        first_option = await scraper.page.query_selector('.b-form-autocomplete-list li:first-child, .autocomplete-list li:first-child')
-        if first_option:
-            await first_option.click()
-            await asyncio.sleep(0.3)
 
     # Нажать "Найти"
     await scraper.page.click("#b-form-submit")
