@@ -76,14 +76,11 @@ async def debug_court_selector():
         print("=" * 80)
         print()
 
-        # Попробовать разные селекторы
+        # ВАЖНО: Ищем поле с name="court", НЕ поле судьи!
         court_selectors = [
-            'input[placeholder*="суд"]',
-            'input[placeholder*="Суд"]',
+            'input[name="court"]',           # Точное имя поля суда
             'input[name*="court"]',
-            'input[id*="court"]',
             '#court',
-            '.court-input',
         ]
 
         court_input = None
@@ -94,12 +91,15 @@ async def debug_court_selector():
                     print(f"✓ Найдено поле: {selector}")
                     placeholder = await inp.get_attribute("placeholder") or ""
                     input_id = await inp.get_attribute("id") or ""
+                    input_name = await inp.get_attribute("name") or ""
+                    print(f"  name: {input_name}")
                     print(f"  placeholder: {placeholder}")
                     print(f"  id: {input_id}")
                     print()
 
                     if not court_input:
                         court_input = inp
+                        break  # Нашли - выходим
             except:
                 pass
 
@@ -143,12 +143,13 @@ async def debug_court_selector():
             grandparent = await court_input.evaluate_handle("el => el.parentElement.parentElement")
             search_element = grandparent.as_element() if grandparent else parent_element
 
-            # Специфичные селекторы для КАД Арбитр
+            # ВАЖНО: Ищем иконку ПЛЮСА рядом с полем
             dropdown_selectors = [
-                'a.b-form-autocomplete-button',            # Точный класс кнопки
-                'a[class*="autocomplete-button"]',         # Любой класс с autocomplete-button
+                'i.b-icon.add',                            # Иконка плюса
+                '.b-icon.add',                             # Класс иконки плюса
+                'i[class*="b-icon"]',                      # Любая иконка b-icon
+                'a.b-form-autocomplete-button',            # Альтернатива - кнопка autocomplete
                 'a[onclick*="showAutocompleteList"]',      # Кнопка с onclick
-                'button[class*="autocomplete"]',
             ]
 
             for selector in dropdown_selectors:
