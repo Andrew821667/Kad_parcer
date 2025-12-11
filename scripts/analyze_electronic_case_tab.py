@@ -51,36 +51,24 @@ async def analyze_electronic_case_tab():
         print("=" * 80)
         print()
 
-        # Поискать вкладки разными селекторами
-        tab_selectors = [
-            "a:has-text('Электронное дело')",
-            "button:has-text('Электронное дело')",
-            "[role='tab']:has-text('Электронное дело')",
-            "li:has-text('Электронное дело')",
-            ".tab:has-text('Электронное дело')",
-            "*:has-text('Электронное дело')",
-        ]
+        # ПРАВИЛЬНЫЙ СЕЛЕКТОР: .js-case-chrono-button--ed
+        # Структура:
+        # <div class="b-case-chrono-button js-case-chrono-button js-case-chrono-button--ed">
+        #     <div class="b-case-chrono-button-text">Электронное дело</div>
+        # </div>
 
-        electronic_tab = None
-        for selector in tab_selectors:
-            try:
-                tab = await scraper.page.query_selector(selector)
-                if tab:
-                    tag = await tab.evaluate("el => el.tagName")
-                    classes = await tab.get_attribute("class") or ""
-                    href = await tab.get_attribute("href") or ""
-                    print(f"✓ Найдена вкладка: {selector}")
-                    print(f"  Tag: <{tag}>")
-                    print(f"  Class: {classes}")
-                    print(f"  Href: {href}")
-                    print()
+        electronic_tab = await scraper.page.query_selector(".js-case-chrono-button--ed")
 
-                    if not electronic_tab:
-                        electronic_tab = tab
-            except Exception as e:
-                print(f"✗ {selector}: {str(e)[:50]}")
-
-        if not electronic_tab:
+        if electronic_tab:
+            tag = await electronic_tab.evaluate("el => el.tagName")
+            classes = await electronic_tab.get_attribute("class") or ""
+            text = await electronic_tab.inner_text()
+            print(f"✅ Найдена вкладка 'Электронное дело'")
+            print(f"   Tag: <{tag}>")
+            print(f"   Class: {classes}")
+            print(f"   Text: {text.strip()}")
+            print()
+        else:
             print("❌ Вкладка 'Электронное дело' не найдена!")
             print("   Давайте посмотрим все вкладки на странице:\n")
 
