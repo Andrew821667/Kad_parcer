@@ -126,51 +126,91 @@ async def debug_court_selector():
         parent = await court_input.evaluate_handle("el => el.parentElement")
         parent_element = parent.as_element()
 
+        dropdown_icon = None
+
         if parent_element:
-            parent_html = await parent_element.inner_html()
-            print("Родительский элемент:")
-            print(parent_html[:300])
+            # Показать структуру родительского элемента
+            parent_html = await parent_element.evaluate("""el => {
+                return el.outerHTML.substring(0, 500);
+            }""")
+            print("Родительский элемент (первые 500 символов):")
+            print(parent_html)
             print()
 
-            # Искать кнопку/иконку раскрытия рядом с полем
+            # Попробовать найти иконку в родительском контейнере
             dropdown_selectors = [
+                'a[class*="b-form-autocomplete-button"]',  # Специфичный селектор для КАД
+                'a[onclick*="showAutocompleteList"]',      # Кнопка с onclick
                 'button',
-                'i',
-                'span.dropdown',
-                '.dropdown-toggle',
-                '.arrow',
-                '.icon',
-                '[class*="arrow"]',
-                '[class*="drop"]',
                 'a',
+                'i',
+                'span[class*="arrow"]',
+                'span[class*="drop"]',
+                '.dropdown-toggle',
+                '[class*="autocomplete-button"]',
             ]
 
-            dropdown_icon = None
             for selector in dropdown_selectors:
                 try:
                     icon = await parent_element.query_selector(selector)
                     if icon:
                         icon_class = await icon.get_attribute("class") or ""
                         icon_tag = await icon.evaluate("el => el.tagName")
-                        print(f"✓ Найдена иконка: <{icon_tag}> class='{icon_class}'")
+                        icon_html = await icon.evaluate("el => el.outerHTML")
+                        print(f"✓ Найдена иконка: {selector}")
+                        print(f"  <{icon_tag}> class='{icon_class}'")
+                        print(f"  HTML: {icon_html[:200]}")
+                        print()
 
                         if not dropdown_icon:
                             dropdown_icon = icon
+                except Exception as e:
+                    pass
+
+        # Если не нашли в родителе, поискать во всей форме
+        if not dropdown_icon:
+            print("⚠️  Иконка не найдена в родительском элементе")
+            print("   Ищу во всей форме...")
+            print()
+
+            # Поискать все ссылки и кнопки рядом с полем суда
+            all_buttons = await scraper.page.query_selector_all('a, button')
+            for btn in all_buttons:
+                try:
+                    onclick = await btn.get_attribute("onclick") or ""
+                    btn_class = await btn.get_attribute("class") or ""
+
+                    if "autocomplete" in onclick.lower() or "autocomplete" in btn_class.lower():
+                        print(f"✓ Найдена возможная кнопка:")
+                        btn_html = await btn.evaluate("el => el.outerHTML")
+                        print(f"  {btn_html[:200]}")
+                        print()
+
+                        if not dropdown_icon:
+                            dropdown_icon = btn
+                            break
                 except:
                     pass
 
-            print()
-
-            # Кликнуть на иконку
-            if dropdown_icon:
-                print("✓ Кликаем на иконку раскрытия списка...")
+        # Кликнуть на иконку
+        if dropdown_icon:
+            print("✓ Кликаем на иконку раскрытия списка...")
+            try:
                 await dropdown_icon.click()
                 await asyncio.sleep(3)
-                print("✓ Кликнули")
-            else:
-                print("⚠️  Иконка не найдена, кликаем на само поле...")
-                await court_input.click()
-                await asyncio.sleep(2)
+                print("✓ Кликнули, ждем 3 секунды...")
+                print()
+            except Exception as e:
+                print(f"❌ Ошибка при клике: {e}")
+                print()
+        else:
+            print("⚠️  Иконка не найдена НИГДЕ!")
+            print("   Пробуем просто кликнуть на поле и ввести текст...")
+            print()
+            await court_input.click()
+            await asyncio.sleep(1)
+            await court_input.type("А", delay=100)
+            await asyncio.sleep(3)
 
         # ====================================================================
         # 4. НАЙТИ ВЫПАДАЮЩИЙ СПИСОК
