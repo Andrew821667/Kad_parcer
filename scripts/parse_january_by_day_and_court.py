@@ -86,19 +86,19 @@ async def parse_day_court(scraper, day: datetime, court_name: str):
         await date_inputs[0].click()
         await asyncio.sleep(0.2)
         await date_inputs[0].fill(day_str)
-        await asyncio.sleep(0.2)
-        # Закрыть datepicker - кликнуть на заголовок формы
-        await scraper.page.click("h1, .b-form-title", force=True)
         await asyncio.sleep(0.3)
+        # Закрыть datepicker - нажать Tab для перехода к следующему полю
+        await scraper.page.keyboard.press("Tab")
+        await asyncio.sleep(0.5)
 
         # Дата ПО
         await date_inputs[1].click()
         await asyncio.sleep(0.2)
         await date_inputs[1].fill(day_str)
-        await asyncio.sleep(0.2)
-        # Закрыть datepicker - кликнуть на заголовок формы
-        await scraper.page.click("h1, .b-form-title", force=True)
         await asyncio.sleep(0.3)
+        # Закрыть datepicker - нажать Tab
+        await scraper.page.keyboard.press("Tab")
+        await asyncio.sleep(0.5)
 
     # Выбрать суд из <select>
     select_element = await scraper.page.query_selector('select#Courts')
