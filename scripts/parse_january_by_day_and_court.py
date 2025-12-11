@@ -100,14 +100,20 @@ async def parse_day_court(scraper, day: datetime, court_name: str):
         await scraper.page.keyboard.press("Tab")
         await asyncio.sleep(0.5)
 
-    # Выбрать суд через input + autocomplete
+    # Выбрать суд через input + кнопка вниз + autocomplete
     court_input = await scraper.page.query_selector('input[placeholder="название суда"]')
     if court_input:
         # Ввести название суда
         await court_input.click()
         await asyncio.sleep(0.3)
         await court_input.fill(court_name)
-        await asyncio.sleep(0.7)
+        await asyncio.sleep(0.3)
+
+        # Кликнуть на кнопку вниз чтобы раскрыть список
+        down_button = await scraper.page.query_selector('.js-down-button')
+        if down_button:
+            await down_button.click()
+            await asyncio.sleep(0.7)
 
         # Кликнуть на первый результат в выпавшем списке
         first_option = await scraper.page.query_selector('.b-form-autocomplete-list li:first-child')
