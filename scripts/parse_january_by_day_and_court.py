@@ -100,15 +100,22 @@ async def parse_day_court(scraper, day: datetime, court_name: str):
         await scraper.page.keyboard.press("Tab")
         await asyncio.sleep(0.5)
 
-    # Выбрать суд из <select> используя select_option()
-    select_element = await scraper.page.query_selector('select#Courts')
-    if select_element:
-        # Выбрать опцию по тексту (label)
-        try:
-            await select_element.select_option(label=court_name)
+    # Выбрать суд через input + autocomplete
+    court_input = await scraper.page.query_selector('input[placeholder="название суда"]')
+    if court_input:
+        # Ввести название суда
+        await court_input.click()
+        await asyncio.sleep(0.3)
+        await court_input.fill(court_name)
+        await asyncio.sleep(0.7)
+
+        # Кликнуть на первый результат в выпавшем списке
+        first_option = await scraper.page.query_selector('.b-form-autocomplete-list li:first-child')
+        if first_option:
+            await first_option.click()
             await asyncio.sleep(0.5)
-        except Exception as e:
-            print(f"     ⚠️  Не удалось выбрать суд '{court_name[:30]}': {str(e)[:50]}")
+        else:
+            print(f"     ⚠️  Autocomplete не появился для '{court_name[:30]}'")
             await asyncio.sleep(0.3)
 
     # Нажать "Найти"
