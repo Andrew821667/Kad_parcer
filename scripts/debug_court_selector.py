@@ -144,15 +144,12 @@ async def debug_court_selector():
             grandparent = await court_input.evaluate_handle("el => el.parentElement.parentElement")
             search_element = grandparent.as_element() if grandparent else parent_element
 
-            # ВАЖНО: Ищем ТРЕУГОЛЬНИК ВНИЗ (стрелку) рядом с полем
+            # ВАЖНО: Ищем кнопку ВНИЗ (down-button)
             dropdown_selectors = [
-                'a.b-form-autocomplete-button',            # Кнопка autocomplete со стрелкой
-                'a[onclick*="showAutocompleteList"]',      # Кнопка с onclick
-                '.b-form-autocomplete-button',             # Класс кнопки
-                'a[class*="autocomplete-button"]',         # Любой класс с autocomplete-button
-                '.dropdown-toggle',                        # Стандартная кнопка dropdown
-                '[class*="arrow"]',                        # Стрелка
-                '[class*="caret"]',                        # Треугольник
+                '.js-down-button',                         # Кнопка вниз с JS классом
+                '.down-button',                            # Кнопка вниз
+                'span.js-down-button',                     # SPAN с классом
+                '[class*="down-button"]',                  # Любой элемент с down-button
             ]
 
             for selector in dropdown_selectors:
@@ -228,25 +225,48 @@ async def debug_court_selector():
                 except:
                     pass
 
-        # Кликнуть на иконку
+        # Кликнуть на кнопку вниз
         if dropdown_icon:
-            print("✓ Кликаем на иконку раскрытия списка...")
+            print("✓ Кликаем на кнопку раскрытия списка...")
             try:
                 await dropdown_icon.click()
-                await asyncio.sleep(3)
-                print("✓ Кликнули, ждем 3 секунды...")
+                await asyncio.sleep(2)
+                print("✓ Кликнули, список должен раскрыться")
                 print()
             except Exception as e:
                 print(f"❌ Ошибка при клике: {e}")
                 print()
         else:
-            print("⚠️  Иконка не найдена НИГДЕ!")
-            print("   Пробуем просто кликнуть на поле и ввести текст...")
+            print("⚠️  Кнопка не найдена!")
             print()
-            await court_input.click()
-            await asyncio.sleep(1)
-            await court_input.type("А", delay=100)
-            await asyncio.sleep(3)
+
+        # Попробовать получить список судов из <select>
+        print("=" * 80)
+        print("5. ПОЛУЧЕНИЕ СПИСКА ИЗ <SELECT>")
+        print("=" * 80)
+        print()
+
+        select_element = await scraper.page.query_selector('select#Courts, select[name="Courts"]')
+        if select_element:
+            print("✓ Найден <select id='Courts'>")
+
+            # Получить все <option>
+            options = await select_element.query_selector_all('option')
+            print(f"✓ Найдено опций: {len(options)}\n")
+
+            print("Первые 20 судов:")
+            for i, option in enumerate(options[:20], 1):
+                try:
+                    value = await option.get_attribute('value') or ""
+                    text = await option.inner_text()
+                    if text.strip():  # Пропустить пустые
+                        print(f"  {i}. [{value}] {text.strip()}")
+                except:
+                    pass
+            print()
+        else:
+            print("❌ <select> не найден")
+            print()
 
         # ====================================================================
         # 4. НАЙТИ ВЫПАДАЮЩИЙ СПИСОК
