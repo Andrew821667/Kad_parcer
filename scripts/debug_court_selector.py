@@ -129,43 +129,75 @@ async def debug_court_selector():
         dropdown_icon = None
 
         if parent_element:
-            # Показать структуру родительского элемента
-            parent_html = await parent_element.evaluate("""el => {
-                return el.outerHTML.substring(0, 500);
+            # Показать структуру родительского элемента и его соседей
+            context_html = await court_input.evaluate("""el => {
+                const parent = el.parentElement;
+                const grandparent = parent.parentElement;
+                return grandparent ? grandparent.outerHTML.substring(0, 1500) : parent.outerHTML.substring(0, 1500);
             }""")
-            print("Родительский элемент (первые 500 символов):")
-            print(parent_html)
+            print("Контекст вокруг поля (первые 1500 символов):")
+            print(context_html)
             print()
 
-            # Попробовать найти иконку в родительском контейнере
+            # Попробовать найти иконку в grandparent (более широкий контекст)
+            grandparent = await court_input.evaluate_handle("el => el.parentElement.parentElement")
+            search_element = grandparent.as_element() if grandparent else parent_element
+
+            # Специфичные селекторы для КАД Арбитр
             dropdown_selectors = [
-                'a[class*="b-form-autocomplete-button"]',  # Специфичный селектор для КАД
+                'a.b-form-autocomplete-button',            # Точный класс кнопки
+                'a[class*="autocomplete-button"]',         # Любой класс с autocomplete-button
                 'a[onclick*="showAutocompleteList"]',      # Кнопка с onclick
-                'button',
-                'a',
-                'i',
-                'span[class*="arrow"]',
-                'span[class*="drop"]',
-                '.dropdown-toggle',
-                '[class*="autocomplete-button"]',
+                'button[class*="autocomplete"]',
             ]
 
             for selector in dropdown_selectors:
                 try:
-                    icon = await parent_element.query_selector(selector)
+                    icon = await search_element.query_selector(selector)
                     if icon:
                         icon_class = await icon.get_attribute("class") or ""
                         icon_tag = await icon.evaluate("el => el.tagName")
                         icon_html = await icon.evaluate("el => el.outerHTML")
                         print(f"✓ Найдена иконка: {selector}")
                         print(f"  <{icon_tag}> class='{icon_class}'")
-                        print(f"  HTML: {icon_html[:200]}")
+                        print(f"  HTML: {icon_html[:300]}")
                         print()
 
                         if not dropdown_icon:
                             dropdown_icon = icon
                 except Exception as e:
                     pass
+
+            # Если не нашли специфичные селекторы, ищем все ссылки и фильтруем
+            if not dropdown_icon:
+                print("⚠️  Специфичные селекторы не сработали")
+                print("   Ищу все ссылки <a> в контексте...")
+                print()
+
+                all_links = await search_element.query_selector_all('a')
+                for link in all_links:
+                    try:
+                        link_class = await link.get_attribute("class") or ""
+                        link_onclick = await link.get_attribute("onclick") or ""
+
+                        # Пропустить декоративные элементы
+                        if any(x in link_class for x in ['lt', 'rt', 'lb', 'rb', 'corners']):
+                            continue
+
+                        # Искать кнопки автокомплита
+                        if "autocomplete" in link_class.lower() or "autocomplete" in link_onclick.lower():
+                            link_html = await link.evaluate("el => el.outerHTML")
+                            print(f"✓ Найдена кнопка autocomplete:")
+                            print(f"  class: {link_class}")
+                            print(f"  onclick: {link_onclick[:100]}")
+                            print(f"  HTML: {link_html[:300]}")
+                            print()
+
+                            if not dropdown_icon:
+                                dropdown_icon = link
+                                break
+                    except:
+                        pass
 
         # Если не нашли в родителе, поискать во всей форме
         if not dropdown_icon:
