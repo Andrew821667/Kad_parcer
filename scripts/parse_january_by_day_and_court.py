@@ -100,20 +100,16 @@ async def parse_day_court(scraper, day: datetime, court_name: str):
         await scraper.page.keyboard.press("Tab")
         await asyncio.sleep(0.5)
 
-    # Выбрать суд из <select>
+    # Выбрать суд из <select> используя select_option()
     select_element = await scraper.page.query_selector('select#Courts')
     if select_element:
-        # Найти опцию с нужным названием суда и выбрать ее
-        await select_element.evaluate(f"""(select, courtName) => {{
-            const options = Array.from(select.options);
-            const option = options.find(opt => opt.text.trim() === courtName);
-            if (option) {{
-                select.value = option.value;
-                // Триггернуть событие change
-                select.dispatchEvent(new Event('change', {{ bubbles: true }}));
-            }}
-        }}""", court_name)
-        await asyncio.sleep(0.5)
+        # Выбрать опцию по тексту (label)
+        try:
+            await select_element.select_option(label=court_name)
+            await asyncio.sleep(0.5)
+        except Exception as e:
+            print(f"     ⚠️  Не удалось выбрать суд '{court_name[:30]}': {str(e)[:50]}")
+            await asyncio.sleep(0.3)
 
     # Нажать "Найти"
     await scraper.page.click("#b-form-submit")
