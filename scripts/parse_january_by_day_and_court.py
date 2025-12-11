@@ -13,7 +13,7 @@ from src.scraper.playwright_scraper import PlaywrightScraper
 
 
 async def get_all_courts(scraper):
-    """Получить список всех судов из выпадающего списка."""
+    """Получить список всех судов из <select id='Courts'>."""
 
     print("=" * 80)
     print("ПОЛУЧЕНИЕ СПИСКА СУДОВ")
@@ -31,32 +31,24 @@ async def get_all_courts(scraper):
     except:
         pass
 
-    # Найти поле "Суд" и кликнуть чтобы раскрыть список
-    court_input = await scraper.page.query_selector('input[placeholder="название суда"]')
-    if not court_input:
-        print("❌ Поле 'Суд' не найдено")
+    # Найти <select id="Courts">
+    select_element = await scraper.page.query_selector('select#Courts, select[name="Courts"]')
+    if not select_element:
+        print("❌ <select id='Courts'> не найден")
         return []
 
-    await court_input.click()
-    await asyncio.sleep(1)
-
-    # Получить все опции из выпадающего списка
-    # Обычно это ul/li элементы после клика на input
-    court_options = await scraper.page.query_selector_all('.b-form-autocomplete-list li, .autocomplete-list li, [role="option"]')
+    # Получить все <option> элементы
+    options = await select_element.query_selector_all('option')
 
     courts = []
-    for option in court_options:
+    for option in options:
         try:
             court_name = await option.inner_text()
             court_name = court_name.strip()
-            if court_name and len(court_name) > 3:  # Фильтр мусора
+            if court_name and len(court_name) > 3:  # Пропустить пустые
                 courts.append(court_name)
         except:
             pass
-
-    # Убрать дубликаты
-    courts = list(set(courts))
-    courts.sort()
 
     print(f"✅ Найдено судов: {len(courts)}")
     print()
