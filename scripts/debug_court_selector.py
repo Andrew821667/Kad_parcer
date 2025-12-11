@@ -76,11 +76,12 @@ async def debug_court_selector():
         print("=" * 80)
         print()
 
-        # ВАЖНО: Ищем поле с name="court", НЕ поле судьи!
+        # ВАЖНО: Ищем поле с placeholder "название суда"!
         court_selectors = [
-            'input[name="court"]',           # Точное имя поля суда
+            'input[placeholder="название суда"]',     # Точный placeholder
+            'input[placeholder*="название суда"]',
+            'input[name="court"]',                    # Альтернатива
             'input[name*="court"]',
-            '#court',
         ]
 
         court_input = None
@@ -143,13 +144,15 @@ async def debug_court_selector():
             grandparent = await court_input.evaluate_handle("el => el.parentElement.parentElement")
             search_element = grandparent.as_element() if grandparent else parent_element
 
-            # ВАЖНО: Ищем иконку ПЛЮСА рядом с полем
+            # ВАЖНО: Ищем ТРЕУГОЛЬНИК ВНИЗ (стрелку) рядом с полем
             dropdown_selectors = [
-                'i.b-icon.add',                            # Иконка плюса
-                '.b-icon.add',                             # Класс иконки плюса
-                'i[class*="b-icon"]',                      # Любая иконка b-icon
-                'a.b-form-autocomplete-button',            # Альтернатива - кнопка autocomplete
+                'a.b-form-autocomplete-button',            # Кнопка autocomplete со стрелкой
                 'a[onclick*="showAutocompleteList"]',      # Кнопка с onclick
+                '.b-form-autocomplete-button',             # Класс кнопки
+                'a[class*="autocomplete-button"]',         # Любой класс с autocomplete-button
+                '.dropdown-toggle',                        # Стандартная кнопка dropdown
+                '[class*="arrow"]',                        # Стрелка
+                '[class*="caret"]',                        # Треугольник
             ]
 
             for selector in dropdown_selectors:
