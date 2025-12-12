@@ -199,7 +199,20 @@ async def main():
         input("⏸️  Нажмите Enter чтобы начать парсинг...")
         print()
 
+        # Загрузить существующие данные если продолжаем парсинг
         all_cases = []
+        if START_DAY > 2:
+            # Поискать промежуточные файлы
+            last_day = START_DAY - 1
+            while last_day >= 2:
+                temp_file = data_dir / f"january_2024_cases_day{last_day}.json"
+                if temp_file.exists():
+                    print(f"📂 Загружаю существующие данные из {temp_file.name}...")
+                    all_cases = json.loads(temp_file.read_text(encoding="utf-8"))
+                    print(f"✅ Загружено {len(all_cases)} дел за дни 2-{last_day}\n")
+                    break
+                last_day -= 1
+
         start_time = datetime.now()
 
         # Парсить каждый день (пропускаем 1 января - праздник!)
