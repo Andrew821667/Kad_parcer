@@ -234,10 +234,16 @@ async def main():
                     cases = await parse_day_court(scraper, day, court_name)
                     day_cases.extend(cases)
                 except Exception as e:
-                    print(f"     ❌ Ошибка: {str(e)[:50]}")
+                    error_msg = str(e)
+                    print(f"     ❌ Ошибка: {error_msg[:50]}")
 
-                # Пауза между судами - 2 секунды чтобы не перегружать сервер
-                await asyncio.sleep(2.0)
+                    # Если ошибка 429 (Too Many Requests) - большая пауза
+                    if "429" in error_msg or "Too Many Requests" in error_msg:
+                        print(f"     ⏸️  Пауза 60 секунд из-за rate limiting...")
+                        await asyncio.sleep(60)
+
+                # Пауза между судами - 5 секунд чтобы не перегружать сервер
+                await asyncio.sleep(5.0)
 
             all_cases.extend(day_cases)
 
