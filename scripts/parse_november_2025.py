@@ -221,7 +221,7 @@ async def main():
             return
 
         # С какого дня начать (можно изменить для продолжения)
-        START_DAY = 1  # Полный парсинг с 1 ноября
+        START_DAY = 5  # Продолжить с 5 ноября (дни 1-4 уже обработаны или пропущены)
 
         # Подсчет рабочих дней
         working_days_count = sum(1 for d in range(START_DAY, 31) if is_working_day(d))
