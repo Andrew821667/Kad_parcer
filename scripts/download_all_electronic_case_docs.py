@@ -112,38 +112,55 @@ async def download_all_documents_from_electronic_case():
 
                     print(f"   [{i}/{len(pdf_links)}] {text.strip()[:60]}")
 
-                    # Скачать PDF через HTTP
-                    async with httpx.AsyncClient(
-                        cookies=cookie_dict,
-                        timeout=30.0,
-                        follow_redirects=True
-                    ) as client:
-                        response = await client.get(href)
+                    # Скачать PDF через HTTP с retry
+                    max_retries = 3
+                    for attempt in range(max_retries):
+                        try:
+                            async with httpx.AsyncClient(
+                                cookies=cookie_dict,
+                                timeout=30.0,
+                                follow_redirects=True
+                            ) as client:
+                                response = await client.get(href)
 
-                        if response.status_code == 200:
-                            content_type = response.headers.get('content-type', '')
+                                if response.status_code == 200:
+                                    content_type = response.headers.get('content-type', '')
 
-                            if 'pdf' in content_type.lower() or href.endswith('.pdf'):
-                                # Извлечь имя файла из URL
-                                filename = href.split("/")[-1]
-                                if not filename.endswith('.pdf'):
-                                    filename += '.pdf'
+                                    if 'pdf' in content_type.lower() or href.endswith('.pdf'):
+                                        # Извлечь имя файла из URL
+                                        filename = href.split("/")[-1]
+                                        if not filename.endswith('.pdf'):
+                                            filename += '.pdf'
 
-                                # Добавить номер для уникальности
-                                filepath = case_folder / f"{total_downloaded + 1:03d}_{filename}"
+                                        # Добавить номер для уникальности
+                                        filepath = case_folder / f"{total_downloaded + 1:03d}_{filename}"
 
-                                filepath.write_bytes(response.content)
+                                        filepath.write_bytes(response.content)
 
-                                print(f"        ✅ {len(response.content)//1024} KB → {filepath.name}")
-                                page_downloaded += 1
-                                total_downloaded += 1
+                                        print(f"        ✅ {len(response.content)//1024} KB → {filepath.name}")
+                                        page_downloaded += 1
+                                        total_downloaded += 1
+                                        break  # Успешно скачали - выходим из retry loop
+                                    else:
+                                        print(f"        ⚠️  Не PDF: {content_type}")
+                                        break  # Не PDF - не retry
+                                else:
+                                    print(f"        ❌ HTTP {response.status_code}")
+                                    if attempt < max_retries - 1:
+                                        print(f"        🔄 Retry {attempt + 1}/{max_retries - 1}...")
+                                        await asyncio.sleep(2)  # Пауза перед retry
+                                    break
+
+                        except Exception as e:
+                            if attempt < max_retries - 1:
+                                print(f"        ⚠️  Попытка {attempt + 1} не удалась: {str(e)[:40]}")
+                                print(f"        🔄 Retry {attempt + 1}/{max_retries - 1}...")
+                                await asyncio.sleep(2)  # Пауза перед retry
                             else:
-                                print(f"        ⚠️  Не PDF: {content_type}")
-                        else:
-                            print(f"        ❌ HTTP {response.status_code}")
+                                print(f"        ❌ Ошибка после {max_retries} попыток: {str(e)[:60]}")
 
                 except Exception as e:
-                    print(f"        ❌ Ошибка: {str(e)[:60]}")
+                    print(f"        ❌ Критическая ошибка: {str(e)[:60]}")
 
             print(f"\n   📊 Скачано на странице {page_num}: {page_downloaded} документов")
             print(f"   📊 Всего скачано: {total_downloaded} документов\n")
