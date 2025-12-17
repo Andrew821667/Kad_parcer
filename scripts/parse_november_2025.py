@@ -5,6 +5,12 @@
 Рабочих дней: 19 (пропускаем выходные и праздники)
 Запросов: 19 дней × ~100 судов = ~1900 запросов
 Ожидаемый результат: ~24,000 дел
+
+ЗАЩИТА ОТ БЛОКИРОВКИ:
+- Автоматическое обнаружение блокировки (15+ судов подряд с 0 результатов)
+- Автоматическая пауза 5 минут при обнаружении блокировки
+- Пауза 2 минуты при явной ошибке 429
+- Базовая пауза 10 секунд между судами
 """
 
 import asyncio
@@ -242,6 +248,11 @@ async def main():
 
         start_time = datetime.now()
 
+        # Счетчик для автоматического обнаружения блокировки
+        consecutive_zero_results = 0
+        BLOCKING_THRESHOLD = 15  # Если 15 судов подряд вернули 0 результатов - возможна блокировка
+        COOLDOWN_SECONDS = 300   # 5 минут паузы при обнаружении блокировки
+
         # Парсить каждый день ноября 2025
         for day_num in range(START_DAY, 31):  # С START_DAY по 30 ноября
             day = datetime(2025, 11, day_num)
@@ -264,13 +275,34 @@ async def main():
 
                 try:
                     cases = await parse_day_court(scraper, day, court_name)
+
+                    # АВТОМАТИЧЕСКОЕ ОБНАРУЖЕНИЕ БЛОКИРОВКИ
+                    if len(cases) == 0:
+                        consecutive_zero_results += 1
+                    else:
+                        consecutive_zero_results = 0  # Сброс счетчика при успешном результате
+
                     day_cases.extend(cases)
+
+                    # Проверка на возможную блокировку
+                    if consecutive_zero_results >= BLOCKING_THRESHOLD:
+                        print(f"\n\n⚠️  ОБНАРУЖЕНА ВОЗМОЖНАЯ БЛОКИРОВКА!")
+                        print(f"    {consecutive_zero_results} судов подряд вернули 0 результатов")
+                        print(f"    ⏸️  Автоматическая пауза {COOLDOWN_SECONDS} секунд для снятия блокировки...")
+                        print(f"    Время начала паузы: {datetime.now().strftime('%H:%M:%S')}")
+                        await asyncio.sleep(COOLDOWN_SECONDS)
+                        consecutive_zero_results = 0  # Сброс счетчика после паузы
+                        print(f"    ▶️  Возобновление работы: {datetime.now().strftime('%H:%M:%S')}\n")
+
                 except Exception as e:
                     error_msg = str(e)
                     print(f"     ❌ Ошибка: {error_msg[:50]}")
 
+                    consecutive_zero_results = 0  # Сброс счетчика при ошибке
+
                     # Если ошибка 429 (Too Many Requests) - большая пауза
                     if "429" in error_msg or "Too Many Requests" in error_msg:
+                        print(f"     ⚠️  ОШИБКА 429 - Rate Limiting!")
                         print(f"     ⏸️  Пауза 120 секунд из-за rate limiting...")
                         await asyncio.sleep(120)
 
