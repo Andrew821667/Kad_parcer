@@ -316,7 +316,7 @@ async def process_single_case(scraper, db: SQLiteManager, case: dict, downloads_
         traceback.print_exc()
 
 
-async def process_multiple_cases(json_path: str, db_path: str, downloads_dir: str = "downloads", documents_dir: str = "documents", start_index: int = 0, max_cases: int = None):
+async def process_multiple_cases(json_path: str, db_path: str, downloads_dir: str = "downloads", documents_dir: str = "documents", start_index: int = 0, max_cases: int = None, cdp_url: str = "http://localhost:9222"):
     """
     Обрабатывает несколько дел из JSON файла.
 
@@ -327,6 +327,7 @@ async def process_multiple_cases(json_path: str, db_path: str, downloads_dir: st
         documents_dir: Directory for MD documents
         start_index: Start from this case index (for resuming)
         max_cases: Maximum number of cases to process (None = all)
+        cdp_url: Chrome CDP URL (default: http://localhost:9222)
     """
     print("=" * 80)
     print("🚀 ИНТЕГРАЦИОННЫЙ PIPELINE")
@@ -369,8 +370,8 @@ async def process_multiple_cases(json_path: str, db_path: str, downloads_dir: st
     print()
 
     # Подключиться к Chrome через CDP
-    print("🔌 Подключение к Chrome (CDP: http://localhost:9222)...")
-    async with PlaywrightScraper(use_cdp=True, cdp_url="http://localhost:9222") as scraper:
+    print(f"🔌 Подключение к Chrome (CDP: {cdp_url})...")
+    async with PlaywrightScraper(use_cdp=True, cdp_url=cdp_url) as scraper:
         print("✅ Подключено к Chrome")
         print()
 
@@ -424,6 +425,7 @@ def main():
     parser.add_argument('--documents', default='documents', help='Directory for MD documents')
     parser.add_argument('--start-index', type=int, default=0, help='Start from case index (for resuming)')
     parser.add_argument('--max-cases', type=int, help='Maximum number of cases to process')
+    parser.add_argument('--cdp-url', default='http://localhost:9222', help='Chrome CDP URL (default: http://localhost:9222)')
 
     args = parser.parse_args()
 
@@ -433,7 +435,8 @@ def main():
         downloads_dir=args.downloads,
         documents_dir=args.documents,
         start_index=args.start_index,
-        max_cases=args.max_cases
+        max_cases=args.max_cases,
+        cdp_url=args.cdp_url
     ))
 
 
