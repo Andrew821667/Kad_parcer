@@ -103,7 +103,12 @@ class DocumentDownloader:
         try:
             # If direct URL provided, use it (much faster!)
             if case_url:
-                full_url = f"https://kad.arbitr.ru{case_url}"
+                # Если URL уже полный - использовать как есть
+                if case_url.startswith('http'):
+                    full_url = case_url
+                else:
+                    # Если относительный - добавить домен
+                    full_url = f"https://kad.arbitr.ru{case_url}"
                 await self.scraper.page.goto(full_url, wait_until="networkidle")
                 await asyncio.sleep(1)
                 return True
