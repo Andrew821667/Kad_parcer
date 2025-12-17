@@ -183,7 +183,8 @@ class CasePipeline:
         try:
             with SQLiteManager(str(self.db_path)) as db:
                 # Импорт с дедупликацией (INSERT OR IGNORE)
-                imported, duplicates = db.bulk_insert_cases(cases)
+                imported = db.bulk_insert_cases(cases)
+                duplicates = len(cases) - imported
 
                 self.checkpoint.update_stats(imported_cases=imported)
 
