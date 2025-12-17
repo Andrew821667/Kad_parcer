@@ -236,8 +236,9 @@ class CasePipeline:
 
             try:
                 # Скачать документы
+                case_url = case.get('url')  # URL из JSON (если есть)
                 result = await self._download_case_documents(
-                    downloader, case_number
+                    downloader, case_number, case_url
                 )
 
                 if result['downloaded'] > 0:
@@ -271,11 +272,12 @@ class CasePipeline:
             await asyncio.sleep(2.0)
 
     async def _download_case_documents(self, downloader: DocumentDownloader,
-                                      case_number: str) -> Dict[str, Any]:
+                                      case_number: str, case_url: str = None) -> Dict[str, Any]:
         """Скачать документы дела."""
         try:
             result = await downloader.download_case_documents(
                 case_number,
+                case_url=case_url,
                 filter_important=True
             )
             return result

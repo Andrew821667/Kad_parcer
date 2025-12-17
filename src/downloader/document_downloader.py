@@ -89,18 +89,26 @@ class DocumentDownloader:
 
         self.last_request_time = time.time()
 
-    async def navigate_to_case(self, case_number: str) -> bool:
+    async def navigate_to_case(self, case_number: str, case_url: str = None) -> bool:
         """
-        Navigate to case page by case number.
+        Navigate to case page by URL or case number.
 
         Args:
             case_number: Case number (e.g., "А40-12345-2024")
+            case_url: Direct URL to case (e.g., "/Card/uuid...")
 
         Returns:
             True if navigation successful, False otherwise
         """
         try:
-            # Search for case on main page
+            # If direct URL provided, use it (much faster!)
+            if case_url:
+                full_url = f"https://kad.arbitr.ru{case_url}"
+                await self.scraper.page.goto(full_url, wait_until="networkidle")
+                await asyncio.sleep(1)
+                return True
+
+            # Fallback: Search for case on main page
             await self.scraper.page.goto("https://kad.arbitr.ru", wait_until="networkidle")
             await asyncio.sleep(1)
 
@@ -255,6 +263,7 @@ class DocumentDownloader:
     async def download_case_documents(
         self,
         case_number: str,
+        case_url: str = None,
         output_dir: Optional[str] = None,
         filter_important: bool = True
     ) -> Dict[str, Any]:
@@ -263,6 +272,7 @@ class DocumentDownloader:
 
         Args:
             case_number: Case number
+            case_url: Direct URL to case (optional, much faster if provided)
             output_dir: Output directory (default: downloads/YYYY/case_number)
             filter_important: Filter only important documents (default: True)
 
@@ -284,7 +294,7 @@ class DocumentDownloader:
 
         try:
             # Navigate to case page
-            success = await self.navigate_to_case(case_number)
+            success = await self.navigate_to_case(case_number, case_url)
             if not success:
                 print(f"Failed to navigate to case {case_number}")
                 return result
